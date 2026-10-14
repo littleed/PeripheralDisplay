@@ -7,7 +7,8 @@ A scene is a YAML document that declares:
   Assistant;
 * ``vars``: values (colours, opacities, ...) derived from signals;
 * ``defs``/``style``/``layers``: SVG fragments, where each layer may carry a
-  ``when`` condition and any fragment may use ``{{ placeholders }}``.
+  ``when`` condition, may ``repeat`` once per item of an ``items`` signal, and
+  any fragment may use ``{{ placeholders }}``.
 
 This module has no Home Assistant dependency so scenes can be validated and
 rendered anywhere. See docs/scene-language.md for the full reference.
@@ -25,15 +26,19 @@ import voluptuous as vol
 import yaml
 
 SCHEMA_ID = "peripheral-display/scene@1"
-SIGNAL_TYPES = ("boolean", "level", "enum", "text")
-SOURCES = ("state", "numeric", "map", "event", "template", "manual")
+SIGNAL_TYPES = ("boolean", "level", "enum", "text", "items")
+SOURCES = ("state", "numeric", "map", "event", "calendar", "template", "manual")
 FILTERS = ("upper", "lower", "truncate")
+# Fields of each item of an items signal, as {{ item.<field> }} in repeat layers.
+ITEM_FIELDS = ("name", "color", "day", "date")
+DEFAULT_ITEM_COLOR = "#3b4047"
 
 _NAME = r"[a-z][a-z0-9_]*"
 _NAME_RE = re.compile(rf"^{_NAME}$")
 _PLACEHOLDER_RE = re.compile(
-    rf"\{{\{{\s*({_NAME})\s*(?:\|\s*([a-z]+)(?::(\d+))?\s*)?\}}\}}"
+    rf"\{{\{{\s*((?:item\.)?{_NAME})\s*((?:\|\s*[a-z]+(?::\d+)?\s*)*)\}}\}}"
 )
+_FILTER_RE = re.compile(r"\|\s*([a-z]+)(?::(\d+))?")
 _TRUE_STRINGS = {"on", "true", "yes", "1", "home", "open", "detected", "playing"}
 
 
@@ -46,6 +51,29 @@ def _name(value: Any) -> str:
         raise vol.Invalid(f"'{value}' must be lower_snake_case")
     return value
 
+
+def _color(value: Any) -> str:
+    """A colour as ``#rrggbb`` from ``#rgb``, ``#rrggbb`` or ``[r, g, b]``."""
+    if isinstance(value, (list, tuple)) and len(value) == 3:
+        try:
+            return "#" + "".join(f"{min(255, max(0, int(c))):02x}" for c in value)
+        except (TypeError, ValueError):
+            pass
+    if isinstance(value, str) and re.fullmatch(r"#([0-9a-fA-F]{3}){1,2}", value):
+        if len(value) == 4:
+            value = "#" + "".join(c * 2 for c in value[1:])
+        return value.lower()
+    raise vol.Invalid(f"'{value}' is not a colour; use #rrggbb or [r, g, b]")
+
+
+CALENDAR_ITEM_SCHEMA = vol.Schema(
+    {
+        vol.Required("name"): vol.All(str, vol.Length(min=1)),
+        vol.Required("calendar"): vol.All(str, vol.Match(r"^calendar\.")),
+        vol.Optional("match", default=[]): vol.All(vol.Coerce(list), [vol.Coerce(str)]),
+        vol.Optional("color", default=DEFAULT_ITEM_COLOR): _color,
+    }
+)
 
 BINDING_SCHEMA = vol.Schema(
     {
@@ -64,6 +92,7 @@ BINDING_SCHEMA = vol.Schema(
         vol.Optional("map"): {str: vol.All(vol.Coerce(list), [vol.Coerce(str)])},
         vol.Optional("compare"): vol.In(("exact", "contains")),
         vol.Optional("days"): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+        vol.Optional("items"): [CALENDAR_ITEM_SCHEMA],
         vol.Optional("event_type"): str,
         vol.Optional("data"): dict,
         vol.Optional("keywords"): vol.All(vol.Coerce(list), [vol.Coerce(str)]),
@@ -88,6 +117,13 @@ _LAYER_SCHEMA = vol.Schema(
     {
         vol.Required("id"): _name,
         vol.Optional("when"): object,
+        vol.Optional("repeat"): {
+            vol.Required("signal"): _name,
+            vol.Optional("step", default=[0, 0]): vol.All(
+                [vol.Coerce(float)], vol.Length(min=2, max=2)
+            ),
+            vol.Optional("max", default=10): vol.All(int, vol.Range(min=1)),
+        },
         vol.Required("svg"): str,
     }
 )
@@ -144,6 +180,17 @@ class Signal:
         if self.type == "enum":
             value = str(raw).strip().lower() if raw is not None else ""
             return value if value in self.options else self.default
+        if self.type == "items":
+            if not isinstance(raw, (list, tuple)):
+                return []
+            return [
+                {
+                    **{f: str(item.get(f) or "") for f in ITEM_FIELDS},
+                    "color": str(item.get("color") or DEFAULT_ITEM_COLOR),
+                }
+                for item in raw
+                if isinstance(item, dict) and item.get("name")
+            ]
         return "" if raw is None else str(raw).strip()
 
     def truthy(self, value: Any) -> bool:
@@ -162,6 +209,7 @@ class Layer:
     id: str
     when: Any
     svg: str
+    repeat: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -234,38 +282,60 @@ class Scene:
 
     def describe(self, values: dict[str, Any]) -> list[str]:
         """Human-readable active signals, e.g. ``["Weather: rain", "Lights"]``."""
-        return [
-            f"{sig.label}: {values[sig.name]}" if sig.type == "enum" else sig.label
-            for sig in self.signals.values()
-            if sig.truthy(values[sig.name])
-        ]
+        def text(sig: Signal) -> str:
+            value = values[sig.name]
+            if sig.type == "enum":
+                return f"{sig.label}: {value}"
+            if sig.type == "items":
+                return f"{sig.label}: {', '.join(item['name'] for item in value)}"
+            return sig.label
+
+        return [text(sig) for sig in self.signals.values() if sig.truthy(values[sig.name])]
 
     def render(self, values: dict[str, Any]) -> str:
         """Render the scene to an SVG document."""
-        values = {**self.defaults(), **values}
+        values = {
+            name: sig.coerce(values[name]) if name in values else sig.default
+            for name, sig in self.signals.items()
+        }
         context = {**values, **self.resolve_vars(values)}
 
-        def fill(text: str) -> str:
+        def fill(text: str, extra: dict[str, Any] | None = None) -> str:
+            scope = {**context, **extra} if extra else context
+
             def replace(match: re.Match[str]) -> str:
-                value = context[match.group(1)]
+                value = scope[match.group(1)]
                 if isinstance(value, bool):
                     value = "on" if value else "off"
                 value = str(value)
-                if match.group(2) == "upper":
-                    value = value.upper()
-                elif match.group(2) == "lower":
-                    value = value.lower()
-                elif match.group(2) == "truncate":
-                    limit = int(match.group(3) or 40)
-                    if len(value) > limit:
-                        value = value[: limit - 1].rstrip() + "…"
+                for name, arg in _FILTER_RE.findall(match.group(2)):
+                    if name == "upper":
+                        value = value.upper()
+                    elif name == "lower":
+                        value = value.lower()
+                    elif name == "truncate":
+                        limit = int(arg or 40)
+                        if len(value) > limit:
+                            value = value[: limit - 1].rstrip() + "…"
                 return escape(value, {'"': "&quot;"})
 
             return _PLACEHOLDER_RE.sub(replace, text)
 
+        def draw(layer: Layer) -> str:
+            if not layer.repeat:
+                return fill(layer.svg)
+            dx, dy = layer.repeat["step"]
+            items = values[layer.repeat["signal"]][: layer.repeat["max"]]
+            return "".join(
+                f'<g transform="translate({dx * i:g} {dy * i:g})">'
+                + fill(layer.svg, {"index": i, **{f"item.{k}": v for k, v in item.items()}})
+                + "</g>"
+                for i, item in enumerate(items)
+            )
+
         title = escape(f"{self.name}: {', '.join(self.describe(values)) or 'calm'}")
         body = "".join(
-            f'<g id="layer-{layer.id}">{fill(layer.svg)}</g>\n'
+            f'<g id="layer-{layer.id}">{draw(layer)}</g>\n'
             for layer in self.layers
             if self.evaluate(layer.when, values)
         )
@@ -308,6 +378,8 @@ def _check_condition(cond: Any, signals: dict[str, Signal], path: str) -> Any:
         raise SceneError(f"{path}: unknown signal '{name}'")
     sig = signals[name]
     tests = set(cond) - {"signal"}
+    if sig.type == "items" and tests:
+        raise SceneError(f"{path}: items signals only support a bare truthiness test")
     if not tests <= {"is", "in", "above", "below"}:
         raise SceneError(f"{path}: unknown keys {sorted(tests - {'is', 'in', 'above', 'below'})}")
     if "is" in tests and len(tests) > 1 or "in" in tests and len(tests) > 1:
@@ -349,7 +421,9 @@ def parse_scene(data: Any) -> Scene:
             label=spec.get("label", name.replace("_", " ").capitalize()),
             description=spec["description"],
             options=options,
-            default=options[0] if options else {"boolean": False, "level": 0.0, "text": ""}.get(spec["type"]),
+            default=options[0]
+            if options
+            else {"boolean": False, "level": 0.0, "text": "", "items": []}[spec["type"]],
             bind=spec["bind"],
         )
         if "default" in spec:
@@ -392,19 +466,29 @@ def parse_scene(data: Any) -> Scene:
         if raw["id"] in seen:
             raise SceneError(f"layers[{i}]: duplicate id '{raw['id']}'")
         seen.add(raw["id"])
+        repeat = raw.get("repeat")
+        if repeat and getattr(signals.get(repeat["signal"]), "type", None) != "items":
+            raise SceneError(f"layers[{i}].repeat: '{repeat['signal']}' is not an items signal")
         layers.append(
-            Layer(raw["id"], _check_condition(raw.get("when"), signals, f"layers[{i}].when"), raw["svg"])
+            Layer(
+                raw["id"],
+                _check_condition(raw.get("when"), signals, f"layers[{i}].when"),
+                raw["svg"],
+                repeat,
+            )
         )
 
     known = set(signals) | set(doc["vars"])
-    for where, text in [("defs", doc["defs"]), ("style", doc["style"])] + [
-        (f"layer '{layer.id}'", layer.svg) for layer in layers
+    in_repeat = {"index"} | {f"item.{f}" for f in ITEM_FIELDS}
+    for where, text, repeated in [("defs", doc["defs"], False), ("style", doc["style"], False)] + [
+        (f"layer '{layer.id}'", layer.svg, bool(layer.repeat)) for layer in layers
     ]:
         for match in _PLACEHOLDER_RE.finditer(text):
-            if match.group(1) not in known:
+            if match.group(1) not in known | (in_repeat if repeated else set()):
                 raise SceneError(f"{where}: unknown placeholder '{match.group(1)}'")
-            if match.group(2) and match.group(2) not in FILTERS:
-                raise SceneError(f"{where}: unknown filter '{match.group(2)}'")
+            for name, _ in _FILTER_RE.findall(match.group(2)):
+                if name not in FILTERS:
+                    raise SceneError(f"{where}: unknown filter '{name}'")
 
     return Scene(
         id=doc["id"],
@@ -427,6 +511,7 @@ SOURCE_TYPES = {
     "numeric": ("boolean", "level", "text"),
     "map": ("enum",),
     "event": ("boolean", "level", "text"),
+    "calendar": ("items",),
     "template": SIGNAL_TYPES,
     "manual": SIGNAL_TYPES,
 }
@@ -435,6 +520,7 @@ SELECTION_KEYS = {
     "numeric": "entity",
     "map": "entity",
     "event": "keywords",
+    "calendar": "items",
     "template": "template",
 }
 
@@ -470,6 +556,7 @@ def resolve_binding(
         "numeric": ("entity",),
         "map": ("entity", "map"),
         "event": ("event_type", "keywords"),
+        "calendar": ("items",),
         "template": ("template",),
     }.get(source)
     if not required or not all(binding.get(k) for k in required):

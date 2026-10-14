@@ -22,6 +22,8 @@ from homeassistant.util import dt as dt_util
 from custom_components.peripheral_display.const import DOMAIN
 
 IMAGE = "image.living_room_art"
+# A bin as the frontend's list editor submits it.
+BIN = {"name": "Recycling", "calendar": "calendar.bins", "match": ["Blue-lidded"], "color": [44, 107, 208]}
 SIGNALS = "sensor.living_room_art_active_signals"
 
 
@@ -63,18 +65,28 @@ async def test_config_flow_creates_display(hass: HomeAssistant) -> None:
     fields = {str(k): k for k in result["data_schema"].schema}
     assert set(fields) == {
         "weather", "night", "motion", "doorbell", "lights",
-        "heating", "cinema", "bin", "offline", "alert",
+        "heating", "cinema", "bins", "offline", "alert",
     }
     assert fields["night"].description == {"suggested_value": ["sun.sun"]}
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {"night": ["sun.sun"], "motion": ["binary_sensor.garden"], "alert": ["octopus"]},
+        {
+            "night": ["sun.sun"],
+            "motion": ["binary_sensor.garden"],
+            "alert": ["octopus"],
+            "bins": [BIN],
+        },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["options"] == {
         "scene": "test_cottage",
-        "selections": {"night": ["sun.sun"], "motion": ["binary_sensor.garden"], "alert": ["octopus"]},
+        "selections": {
+            "night": ["sun.sun"],
+            "motion": ["binary_sensor.garden"],
+            "alert": ["octopus"],
+            "bins": [BIN],
+        },
         "overrides": {},
     }
     await hass.async_block_till_done()
@@ -88,7 +100,6 @@ async def test_signals_follow_home_state(hass: HomeAssistant, hass_client) -> No
     hass.states.async_set("light.hall", "off")
     hass.states.async_set("climate.house", "heat", {"hvac_action": "idle"})
     hass.states.async_set("media_player.cinema", "paused")
-    hass.states.async_set("sensor.bins", "Garden waste in 2 days")
     hass.states.async_set("binary_sensor.ping", "on")
     await _setup(
         hass,
@@ -97,7 +108,6 @@ async def test_signals_follow_home_state(hass: HomeAssistant, hass_client) -> No
             "lights": ["light.kitchen", "light.hall"],
             "heating": ["climate.house"],
             "cinema": ["media_player.cinema"],
-            "bin": "sensor.bins",
             "offline": ["binary_sensor.ping"],
         },
     )
@@ -106,7 +116,6 @@ async def test_signals_follow_home_state(hass: HomeAssistant, hass_client) -> No
     assert values["lights"] == 0.5
     assert values["heating"] == 0.0
     assert values["cinema"] is False
-    assert values["bin"] == "garden"
     assert values["offline"] is False
 
     hass.states.async_set("climate.house", "heat", {"hvac_action": "heating"})
@@ -220,33 +229,55 @@ def _all_day(day: str, summary: str) -> CalendarEvent:
     return CalendarEvent(start=start, end=start + timedelta(days=1), summary=summary)
 
 
-async def test_bin_from_calendar_events(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+async def test_bins_from_calendars(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, hass_client_no_auth
 ) -> None:
     freezer.move_to("2026-10-14 12:00:00+00:00")  # a Wednesday
-    calendar = BinCalendar()
-    calendar.items = [
+    council, garden = BinCalendar(), BinCalendar()
+    council.items = [
         _all_day("2026-10-15", "Dentist"),
-        _all_day("2026-10-16", "Food waste"),
-        _all_day("2026-10-16", "Blue bin recycling collection"),
-        _all_day("2026-10-23", "Non-recyclable waste"),
+        _all_day("2026-10-16", "Blue-lidded Recycling Bin"),
+        _all_day("2026-10-16", "Glass, Metals, Plastics and Cartons"),
+        _all_day("2026-10-23", "General Waste"),
     ]
-    setup_test_component_platform(hass, "calendar", [calendar])
+    garden._attr_name = "Garden bin"
+    garden.items = [_all_day("2026-10-20", "Collection")]
+    setup_test_component_platform(hass, "calendar", [council, garden])
     assert await async_setup_component(hass, "calendar", {"calendar": {"platform": "test"}})
     await hass.async_block_till_done()
 
-    await _setup(hass, {"bin": "calendar.bins"})
-    # Not the next event (Dentist), and recycling outranks food on the same day.
-    assert _signals(hass)["bin"] == "recycling"
+    bins = [
+        {"name": "Recycling", "calendar": "calendar.bins", "match": ["blue-lidded"], "color": [44, 107, 208]},
+        {"name": "General", "calendar": "calendar.bins", "match": ["General Waste"], "color": [43, 43, 46]},
+        # Its own calendar, so any event counts.
+        {"name": "Food & Garden", "calendar": "calendar.garden_bin", "color": [122, 78, 45]},
+        {"name": "Glass & Plastics", "calendar": "calendar.bins", "match": ["glass"], "color": [62, 142, 58]},
+    ]
+    await _setup(hass, {"bins": bins})
+    # Two bins on Friday plus the garden bin next Tuesday; General (23rd) is
+    # beyond today + 6 days. Ordered by date, then by the list above.
+    assert [(b["name"], b["day"], b["color"]) for b in _signals(hass)["bins"]] == [
+        ("Recycling", "FRI", "#2c6bd0"),
+        ("Glass & Plastics", "FRI", "#3e8e3a"),
+        ("Food & Garden", "TUE", "#7a4e2d"),
+    ]
+    # Fetched like the dashboard card does, via the image's token URL.
+    client = await hass_client_no_auth()
+    picture = hass.states.get(IMAGE).attributes["entity_picture"]
+    svg = await (await client.get(picture)).text()
+    assert svg.count('class="tag">FRI<') == 2 and svg.count('class="tag">TUE<') == 1
 
-    # Friday's collection is cancelled; the 23rd is beyond the 7-day window.
-    calendar.items = [calendar.items[0], calendar.items[3]]
-    await _advance(hass, freezer, 15 * 60)
-    assert _signals(hass)["bin"] == "none"
-
-    # By Saturday the 23rd is within the window; 'non-recycl' beats 'recycl'.
-    await _advance(hass, freezer, 3 * 24 * 3600)
-    assert _signals(hass)["bin"] == "general"
+    # On collection day, today's bins still show, next week's do not.
+    await _advance(hass, freezer, 2 * 24 * 3600)  # Friday 16th
+    assert [b["name"] for b in _signals(hass)["bins"]] == [
+        "Recycling", "Glass & Plastics", "Food & Garden",
+    ]
+    # Saturday: the 23rd is now within the week.
+    await _advance(hass, freezer, 24 * 3600)
+    assert [(b["name"], b["day"]) for b in _signals(hass)["bins"]] == [
+        ("Food & Garden", "TUE"),
+        ("General", "FRI"),
+    ]
 
 
 async def test_alert_matches_feed_keywords(
@@ -301,19 +332,19 @@ async def test_advanced_options_rebind_signal(hass: HomeAssistant) -> None:
         result["flow_id"], {"next_step_id": "advanced"}
     )
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"overrides": {"bin": {"source": "state", "entities": ["sensor.x"]}}}
+        result["flow_id"], {"overrides": {"bins": {"source": "state", "entities": ["sensor.x"]}}}
     )
     assert result["errors"] == {"base": "invalid_binding"}
 
-    hass.states.async_set("input_select.bin_week", "Blue week")
+    hass.states.async_set("input_boolean.bedtime", "on")
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
             "overrides": {
                 "heating": {"source": "numeric", "entity": "sensor.boiler_power", "max": 24000},
-                "bin": {
+                "night": {
                     "source": "template",
-                    "template": "{{ 'recycling' if is_state('input_select.bin_week', 'Blue week') else 'general' }}",
+                    "template": "{{ is_state('input_boolean.bedtime', 'on') }}",
                 },
             }
         },
@@ -321,7 +352,7 @@ async def test_advanced_options_rebind_signal(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
     assert _signals(hass)["heating"] == 0.25
-    assert _signals(hass)["bin"] == "recycling"
-    hass.states.async_set("input_select.bin_week", "Black week")
+    assert _signals(hass)["night"] is True
+    hass.states.async_set("input_boolean.bedtime", "off")
     await hass.async_block_till_done()
-    assert _signals(hass)["bin"] == "general"
+    assert _signals(hass)["night"] is False

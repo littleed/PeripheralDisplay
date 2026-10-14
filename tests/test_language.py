@@ -46,13 +46,13 @@ def test_test_scene_renders_valid_svg_for_every_combination() -> None:
     """Every layer of the shipped scene produces well-formed SVG together."""
     scene = load_scene_file(TEST_SCENE)
     weathers = scene.signals["weather"].options
-    bins = scene.signals["bin"].options
+    bins = [{"name": "Glass & <plastics>", "color": "#3e8e3a", "day": "FRI", "date": "2026-10-16"}] * 3
     seen: set[str] = set()
-    for weather, night, bin_, on in itertools.product(weathers, (False, True), bins, (False, True)):
+    for weather, night, on in itertools.product(weathers, (False, True), (False, True)):
         values = {
             "weather": weather,
             "night": night,
-            "bin": bin_,
+            "bins": bins if on else [],
             "motion": on,
             "doorbell": on,
             "lights": 1.0 if on else 0.0,
@@ -94,6 +94,9 @@ def test_conditions_vars_and_text() -> None:
             "map keys must be options",
         ),
         (lambda d: d["signals"]["weather"].update(bind={"source": "state"}), "cannot drive a enum signal"),
+        (lambda d: d["layers"][0].update(svg="{{ item.color }}"), "unknown placeholder 'item.color'"),
+        (lambda d: d["layers"][0].update(repeat={"signal": "lights"}), "not an items signal"),
+        (lambda d: d["layers"][0].update(svg="{{ sky|upper|shout }}"), "unknown filter 'shout'"),
     ],
 )
 def test_validation_errors(mutate, message: str) -> None:
@@ -101,6 +104,38 @@ def test_validation_errors(mutate, message: str) -> None:
     mutate(doc)
     with pytest.raises(SceneError, match=message):
         parse_scene(doc)
+
+
+def test_repeat_layers() -> None:
+    doc = deepcopy(BASE)
+    doc["signals"]["bins"] = {"type": "items"}
+    doc["layers"].append(
+        {
+            "id": "bins",
+            "when": "bins",
+            "repeat": {"signal": "bins", "step": [10, 2], "max": 2},
+            "svg": '<rect fill="{{ item.color }}"><title>{{ index }} {{ item.day }} {{ item.name|upper|truncate:6 }}</title></rect>',
+        }
+    )
+    scene = parse_scene(doc)
+    assert "layer-bins" not in _layers(scene.render({}))
+    root = ET.fromstring(
+        scene.render(
+            {
+                "bins": [
+                    {"name": "Recycling", "color": "#2c6bd0", "day": "FRI"},
+                    {"name": "Food", "day": "TUE"},
+                    {"name": "General", "color": "#000000", "day": "FRI"},
+                ]
+            }
+        )
+    )
+    copies = root.find("{http://www.w3.org/2000/svg}g[@id='layer-bins']")
+    # Capped at max, each copy shifted by one more step, colour defaulted.
+    assert [g.get("transform") for g in copies] == ["translate(0 0)", "translate(10 2)"]
+    rects = [g[0] for g in copies]
+    assert [r.get("fill") for r in rects] == ["#2c6bd0", "#3b4047"]
+    assert [r[0].text for r in rects] == ["0 FRI RECYC…", "1 TUE FOOD"]
 
 
 def test_resolve_binding() -> None:
@@ -115,4 +150,15 @@ def test_resolve_binding() -> None:
     templated = resolve_binding(motion, ["binary_sensor.hall"], {"source": "template", "template": "{{ true }}"})
     assert templated == {"source": "template", "template": "{{ true }}"}
     with pytest.raises(SceneError):
-        resolve_binding(scene.signals["bin"], None, {"source": "state", "entities": ["sensor.x"]})
+        resolve_binding(scene.signals["bins"], None, {"source": "state", "entities": ["sensor.x"]})
+
+    bins = scene.signals["bins"]
+    assert resolve_binding(bins) is None
+    bound = resolve_binding(
+        bins, [{"name": "Recycling", "calendar": "calendar.bins", "color": [44, 107, 208]}]
+    )
+    assert bound["items"] == [
+        {"name": "Recycling", "calendar": "calendar.bins", "match": [], "color": "#2c6bd0"}
+    ]
+    with pytest.raises(SceneError):
+        resolve_binding(bins, [{"name": "Recycling", "calendar": "sensor.bins"}])

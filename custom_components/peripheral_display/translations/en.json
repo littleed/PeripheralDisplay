@@ -26,7 +26,7 @@
           "lights": "Lights",
           "heating": "Heating",
           "cinema": "Cinema",
-          "bin": "Bin collection",
+          "bins": "Bins",
           "offline": "Internet connectivity",
           "alert": "Alert keywords"
         },
@@ -38,7 +38,7 @@
           "lights": "The share of these lights that are on.",
           "heating": "Climate entities; shown while they report they are heating.",
           "cinema": "Media players; shown while any is playing.",
-          "bin": "A bin calendar (its events in the next 7 days are searched) or a sensor naming the bin.",
+          "bins": "Add one entry per bin: the name shown on it, the calendar with its collections, words in the event title that mean this bin (leave empty if the calendar only has this bin) and its colour. Every bin due in the next 7 days is shown.",
           "offline": "Connectivity binary sensors (e.g. Ping); the scene shows a fault when they are off.",
           "alert": "Feed reader items (e.g. a Google Alerts RSS feed) whose title or summary contains one of these keywords."
         }
@@ -73,9 +73,21 @@
           "lights": "Lights",
           "heating": "Heating",
           "cinema": "Cinema",
-          "bin": "Bin collection",
+          "bins": "Bins",
           "offline": "Internet connectivity",
           "alert": "Alert keywords"
+        },
+        "data_description": {
+          "weather": "A weather entity; its condition picks the sky.",
+          "night": "Defaults to the sun being below the horizon.",
+          "motion": "Motion binary sensors, motion event entities, or timestamp sensors such as Ring's Last motion; shown for 2 minutes after motion.",
+          "doorbell": "Binary sensors, doorbell event entities, or timestamp sensors such as Ring's Last ding; shown for 1 minute after a ring.",
+          "lights": "The share of these lights that are on.",
+          "heating": "Climate entities; shown while they report they are heating.",
+          "cinema": "Media players; shown while any is playing.",
+          "bins": "Add one entry per bin: the name shown on it, the calendar with its collections, words in the event title that mean this bin (leave empty if the calendar only has this bin) and its colour. Every bin due in the next 7 days is shown.",
+          "offline": "Connectivity binary sensors (e.g. Ping); the scene shows a fault when they are off.",
+          "alert": "Feed reader items (e.g. a Google Alerts RSS feed) whose title or summary contains one of these keywords."
         }
       },
       "advanced": {

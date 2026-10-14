@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import logging
 from typing import Any
 
@@ -35,6 +35,7 @@ _INVALID = (STATE_UNAVAILABLE, STATE_UNKNOWN)
 DEFAULT_MOMENTARY_HOLD = 30.0
 DEFAULT_CALENDAR_DAYS = 7
 CALENDAR_REFRESH = timedelta(minutes=15)
+_WEEKDAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
 
 def _read(binding: dict[str, Any], state: State | None) -> Any:
@@ -89,12 +90,47 @@ def _map_option(binding: dict[str, Any], value: str) -> str | None:
     return best[2] if best else None
 
 
-def _is_calendar_map(binding: dict[str, Any]) -> bool:
-    return (
-        binding["source"] == "map"
-        and binding["entity"].startswith("calendar.")
-        and "attribute" not in binding
-    )
+def _event_date(event: dict[str, Any]) -> date | None:
+    """The local date an event (from calendar.get_events) starts."""
+    start = str(event.get("start", ""))
+    if when := dt_util.parse_datetime(start):
+        return dt_util.as_local(when).date() if when.tzinfo else when.date()
+    try:
+        return date.fromisoformat(start[:10])
+    except ValueError:
+        return None
+
+
+def _due_items(
+    binding: dict[str, Any], events: dict[str, list[dict[str, Any]] | None], today: date
+) -> list[dict[str, str]]:
+    """Items with a matching calendar event from today for ``days`` days."""
+    end = today + timedelta(days=binding.get("days", DEFAULT_CALENDAR_DAYS))
+    due = []
+    for index, item in enumerate(binding["items"]):
+        keywords = [k.lower() for k in item["match"]]
+        dates = [
+            max(day, today)  # an event that began earlier is still on today
+            for event in events.get(item["calendar"]) or []
+            if (day := _event_date(event)) is not None
+            and day < end
+            and (
+                not keywords
+                or any(k in str(event.get("summary", "")).lower() for k in keywords)
+            )
+        ]
+        if dates:
+            day = min(dates)
+            due.append((day, index, item))
+    return [
+        {
+            "name": item["name"],
+            "color": item["color"],
+            "day": _WEEKDAYS[day.weekday()],
+            "date": day.isoformat(),
+        }
+        for day, _, item in sorted(due, key=lambda d: d[:2])
+    ]
 
 
 class DisplayRuntime:
@@ -114,7 +150,9 @@ class DisplayRuntime:
         self._last_active: dict[tuple[str, str], datetime] = {}
         self._events: dict[str, tuple[datetime, str]] = {}
         self._templates: dict[str, Any] = {}
-        self._calendars: dict[str, list[dict[str, Any]] | None] = {}
+        # Events from today onwards, per calendar entity.
+        self._calendar_events: dict[str, list[dict[str, Any]] | None] = {}
+        self._calendar_days: dict[str, int] = {}
         self._cleared: dict[str, datetime] = {}
         self._timer: CALLBACK_TYPE | None = None
         self._next_expiry: datetime | None = None
@@ -129,14 +167,12 @@ class DisplayRuntime:
                 watched.update(binding["entities"])
             elif source in ("numeric", "map"):
                 watched.add(binding["entity"])
-                if _is_calendar_map(binding):
-                    self._refresh_calendar(name)
-                    self._unsubs.append(
-                        async_track_time_interval(
-                            self.hass,
-                            callback(lambda _now, name=name: self._refresh_calendar(name)),
-                            CALENDAR_REFRESH,
-                        )
+            elif source == "calendar":
+                days = binding.get("days", DEFAULT_CALENDAR_DAYS)
+                for item in binding["items"]:
+                    calendar = item["calendar"]
+                    self._calendar_days[calendar] = max(
+                        days, self._calendar_days.get(calendar, 0)
                     )
             elif source == "event":
                 self._unsubs.append(
@@ -155,6 +191,17 @@ class DisplayRuntime:
                 )
                 info.async_refresh()
                 self._unsubs.append(info.async_remove)
+        if self._calendar_days:
+            watched.update(self._calendar_days)
+            for calendar in self._calendar_days:
+                self._refresh_calendar(calendar)
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    callback(lambda _now: [self._refresh_calendar(c) for c in self._calendar_days]),
+                    CALENDAR_REFRESH,
+                )
+            )
         if watched:
             self._unsubs.append(
                 async_track_state_change_event(self.hass, list(watched), self._on_state)
@@ -205,9 +252,9 @@ class DisplayRuntime:
         entity_id = event.data["entity_id"]
         old, new = event.data["old_state"], event.data["new_state"]
         now = dt_util.utcnow()
+        if entity_id in self._calendar_days:
+            self._refresh_calendar(entity_id)
         for name, binding in self.bindings.items():
-            if _is_calendar_map(binding) and binding["entity"] == entity_id:
-                self._refresh_calendar(name)
             if binding["source"] != "state" or entity_id not in binding["entities"]:
                 continue
             if _momentary(binding, entity_id, new):
@@ -252,20 +299,21 @@ class DisplayRuntime:
         self._recompute()
 
     @callback
-    def _refresh_calendar(self, name: str) -> None:
-        self.hass.async_create_task(self._async_refresh_calendar(name), eager_start=True)
+    def _refresh_calendar(self, entity_id: str) -> None:
+        self.hass.async_create_task(
+            self._async_refresh_calendar(entity_id), eager_start=True
+        )
 
-    async def _async_refresh_calendar(self, name: str) -> None:
-        """Fetch the calendar's events for the coming days."""
-        binding = self.bindings[name]
-        entity_id = binding["entity"]
+    async def _async_refresh_calendar(self, entity_id: str) -> None:
+        """Fetch a calendar's events from the start of today."""
         try:
             response = await self.hass.services.async_call(
                 "calendar",
                 "get_events",
                 {
                     "entity_id": entity_id,
-                    "duration": {"days": binding.get("days", DEFAULT_CALENDAR_DAYS)},
+                    "start_date_time": dt_util.start_of_local_day(),
+                    "duration": {"days": self._calendar_days[entity_id] + 1},
                 },
                 blocking=True,
                 return_response=True,
@@ -276,7 +324,7 @@ class DisplayRuntime:
             events = None
         else:
             events = (response or {}).get(entity_id, {}).get("events", [])
-        self._calendars[name] = events
+        self._calendar_events[entity_id] = events
         self._recompute()
 
     @callback
@@ -347,17 +395,9 @@ class DisplayRuntime:
             level = (number - low) / (high - low) if high != low else float(number > low)
             level = min(1.0, max(0.0, level))
             return 1 - level if binding.get("invert") else level
+        if source == "calendar":
+            return _due_items(binding, self._calendar_events, dt_util.now().date())
         if source == "map":
-            if _is_calendar_map(binding):
-                # The earliest day with a matching event wins; on the same day
-                # the option listed first in the map wins.
-                options = list(binding["map"])
-                matches = [
-                    (str(event.get("start", ""))[:10], options.index(option), option)
-                    for event in self._calendars.get(sig.name) or []
-                    if (option := _map_option(binding, str(event.get("summary", ""))))
-                ]
-                return min(matches)[2] if matches else None
             value = _read(binding, self.hass.states.get(binding["entity"]))
             return None if value is None else _map_option(binding, str(value))
         if source == "event":

@@ -7,7 +7,7 @@
 #   lights   -> windows light up in proportion to the lights that are on
 #   heating  -> chimney smoke, denser with more heating
 #   cinema   -> the snug window flickers with two viewers silhouetted
-#   bin      -> the bin out for Friday's collection, in its colour
+#   bins     -> every bin due in the coming week, in its own colour and with its day
 #   offline  -> the telephone wire snaps and sparks (a bird sits on it when online)
 #   alert    -> a pigeon flies in with the matching headline on a banner
 schema: peripheral-display/scene@1
@@ -84,22 +84,14 @@ signals:
       source: state
       domains: [media_player]
       match: [playing]
-  bin:
-    type: enum
-    label: Bin day
-    description: The bin out for the next collection in the coming week.
-    options: [none, general, recycling, garden, food]
+  bins:
+    type: items
+    label: Bins
+    description: Every bin with a collection in the coming week, in its colour, labelled with its day.
     bind:
-      source: map
-      domains: [calendar, sensor, input_select]
-      compare: contains
+      source: calendar
       days: 7
-      # Listed in priority order for collections on the same day.
-      map:
-        recycling: [recycl, blue, paper, plastic, glass, mixed]
-        garden: [garden, green, brown]
-        general: [general, refuse, rubbish, landfill, residual, household, non-recycl, black, grey, gray]
-        food: [food, caddy]
+      items: []
   offline:
     type: boolean
     label: Internet offline
@@ -217,11 +209,6 @@ vars:
   visitor:
     - {when: night, value: "#0d0b12"}
     - value: "#2b2534"
-  bin_color:
-    - {when: {signal: bin, is: recycling}, value: "#2c6bd0"}
-    - {when: {signal: bin, is: garden}, value: "#3e8e3a"}
-    - {when: {signal: bin, is: food}, value: "#8b5a2b"}
-    - value: "#3b4047"
   vignette:
     - {when: night, value: 0.55}
     - value: 0.22
@@ -326,7 +313,7 @@ style: |
   .fog { animation: drift 24s ease-in-out infinite alternate; }
   .banner-text { font: 700 19px Georgia, 'Times New Roman', serif; fill: #7a2b1f; }
   .tag { font: 700 13px Helvetica, Arial, sans-serif; fill: #1d1d1d; }
-  .tag-small { font: 700 8px Helvetica, Arial, sans-serif; fill: #1d1d1d; }
+  .tag-small { font: 700 7px Helvetica, Arial, sans-serif; fill: #1d1d1d; }
 
 layers:
   - id: sky
@@ -559,26 +546,6 @@ layers:
       <g fill="{{ fence }}"><rect x="1100" y="746" width="500" height="7"/><rect x="1100" y="773" width="500" height="7"/></g>
       <rect x="1100" y="726" width="500" height="70" fill="url(#pickets)"/>
 
-  - id: wheelie_bin
-    when: {signal: bin, in: [general, recycling, garden]}
-    svg: |
-      <path d="M1225,746 L1295,746 L1290,846 L1230,846 Z" fill="{{ bin_color }}"/>
-      <rect x="1219" y="734" width="82" height="15" rx="4" fill="{{ bin_color }}"/>
-      <rect x="1219" y="734" width="82" height="15" rx="4" fill="#000" opacity="0.25"/>
-      <circle cx="1290" cy="848" r="9" fill="#1e1e1e"/>
-      <rect x="1231" y="764" width="58" height="34" rx="4" fill="#fdfdf8"/>
-      <text x="1260" y="780" text-anchor="middle" class="tag">FRI</text>
-      <text x="1260" y="792" text-anchor="middle" class="tag-small">{{ bin|upper }}</text>
-
-  - id: food_caddy
-    when: {signal: bin, is: food}
-    svg: |
-      <rect x="1232" y="800" width="52" height="46" rx="5" fill="{{ bin_color }}"/>
-      <rect x="1228" y="794" width="60" height="10" rx="4" fill="#5e3c1c"/>
-      <rect x="1240" y="810" width="36" height="26" rx="3" fill="#fdfdf8"/>
-      <text x="1258" y="822" text-anchor="middle" class="tag" style="font-size:10px">FRI</text>
-      <text x="1258" y="832" text-anchor="middle" class="tag-small" style="font-size:7px">FOOD</text>
-
   - id: pole
     svg: |
       <rect x="1444" y="430" width="12" height="368" fill="{{ pole }}"/>
@@ -607,6 +574,19 @@ layers:
       <polygon points="1384,598 1388,607 1398,606 1390,613 1394,623 1384,617 1374,623 1378,613 1370,606 1380,607" fill="#ffe14d" class="spark"/>
       <circle cx="1450" cy="478" r="10" fill="#ff3b30" opacity="0.4" filter="url(#blur)" class="blink"/>
       <circle cx="1450" cy="478" r="5" fill="#ff3b30" class="blink"/>
+
+  - id: bins
+    when: bins
+    repeat: {signal: bins, step: [88, 0], max: 5}
+    svg: |
+      <path d="M1146,746 L1216,746 L1211,846 L1151,846 Z" fill="{{ item.color }}"/>
+      <rect x="1140" y="734" width="82" height="15" rx="4" fill="{{ item.color }}"/>
+      <rect x="1140" y="734" width="82" height="15" rx="4" fill="#000" opacity="0.25"/>
+      <path d="M1146,746 L1216,746 L1215,762 L1147,762 Z" fill="#000" opacity="0.12"/>
+      <circle cx="1211" cy="848" r="9" fill="#1e1e1e"/>
+      <rect x="1149" y="768" width="64" height="34" rx="4" fill="#fdfdf8"/>
+      <text x="1181" y="784" text-anchor="middle" class="tag">{{ item.day }}</text>
+      <text x="1181" y="796" text-anchor="middle" class="tag-small">{{ item.name|upper|truncate:13 }}</text>
 
   - id: fog_near
     when: {signal: weather, is: fog}

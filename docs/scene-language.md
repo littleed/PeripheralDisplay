@@ -39,7 +39,7 @@ A signal is a named, typed input to the artwork.
 ```yaml
 signals:
   motion:
-    type: boolean            # boolean | level | enum | text
+    type: boolean            # boolean | level | enum | text | items
     label: Motion            # optional, defaults to the name
     description: A fox crosses the garden.
     options: [...]           # enum only: allowed values; the first is the default
@@ -53,6 +53,12 @@ signals:
 | `level`   | a number from 0 to 1          | `0`                | above 0                  |
 | `enum`    | one of `options`              | the first option   | not `none` (or empty)    |
 | `text`    | any string                    | `""`               | not empty                |
+| `items`   | a list of items (see below)   | empty list         | not empty                |
+
+An `items` value is a list of things that are currently relevant, such as the
+bins due this week. Each item has `name`, `color` (`#rrggbb`), `day` (`MON` to
+`SUN`) and `date` (`YYYY-MM-DD`). Items signals are drawn with `repeat` layers
+and support only bare conditions (`when: bins`).
 
 Raw values are coerced to the type: `on`, `true`, `yes`, `1`, `home`, `open`,
 `detected` and `playing` are true; levels are clamped to 0–1; an enum value
@@ -73,7 +79,7 @@ form shows friendly labels:
 | `lights`   | level   | the share of chosen lights that are on          |
 | `heating`  | level   | how much heating is running                     |
 | `cinema`   | boolean | a film is playing                               |
-| `bin`      | enum    | `none general recycling garden food`            |
+| `bins`     | items   | the bins due for collection in the coming week  |
 | `offline`  | boolean | the internet connection is down                 |
 | `alert`    | text    | headline of a matching news or Google alert     |
 
@@ -90,8 +96,9 @@ at its default.
 |------------|-------------------------|----------------|------|
 | `state`    | boolean, level, text    | `entities`     | `match`, `attribute`, `mode`, `hold`, `invert` |
 | `numeric`  | level, boolean, text    | `entity`       | `attribute`, `min`, `max`, `invert` |
-| `map`      | enum                    | `entity`       | `map`, `compare`, `attribute`, `days` |
+| `map`      | enum                    | `entity`       | `map`, `compare`, `attribute` |
 | `event`    | boolean, level, text    | `keywords`     | `event_type`, `data`, `fields`, `text_field`, `hold` |
+| `calendar` | items                   | `items`        | `days` |
 | `template` | any                     | `template`     | |
 | `manual`   | any                     | nothing        | only set by actions |
 
@@ -137,18 +144,37 @@ signal's default. `compare: exact` (default) or `contains` (substring). With
 `contains`, the longest matching keyword wins, so `non-recycl` beats `recycl`
 for "Non-recyclable waste".
 
-A `calendar.*` entity is searched instead: every event in the next `days`
-days (default 7) is matched by its title, and the earliest day with a match
-wins. When several bins share that day, the option listed first in `map`
-wins. Events are re-read when the calendar changes and every 15 minutes.
+```yaml
+weather:
+  source: map
+  entity: weather.home
+  map: {clear: [sunny, clear-night], rain: [rainy, pouring]}
+```
+
+### `calendar`: items from calendar events
+
+`items` lists the things to look for, each with:
+
+- `name`: shown in the artwork;
+- `calendar`: a `calendar.*` entity;
+- `match`: words that identify its events by title, case-insensitively;
+  leave it out to count every event in that calendar;
+- `color`: `#rrggbb` or `[r, g, b]` (default dark grey).
+
+An item is included when its calendar has a matching event from today through
+the next `days` days (default 7, so today plus six more), with `day` and `date`
+from its earliest such event. Items are ordered by date, then by their order in
+`items`. Events are re-read when a calendar changes and every 15 minutes. One
+shared calendar (with `match` words) and one calendar per item both work.
 
 ```yaml
-bin:
-  source: map
-  entity: calendar.bins
-  compare: contains
-  days: 7
-  map: {recycling: [recycl, blue], garden: [garden, green]}
+bins:
+  source: calendar
+  items:
+    - {name: Recycling, calendar: calendar.bins, match: [Blue-lidded], color: "#2c6bd0"}
+    - {name: General, calendar: calendar.bins, match: [General Waste], color: "#2b2b2e"}
+    - {name: Food & Garden, calendar: calendar.bins, match: [Food and Garden], color: "#7a4e2d"}
+    - {name: Glass & Plastics, calendar: calendar.bins, match: [Glass], color: "#3e8e3a"}
 ```
 
 ### `event`: Home Assistant bus events
@@ -174,10 +200,10 @@ the entities it references change. Use it for anything the other sources
 cannot express:
 
 ```yaml
-bin:
+night:
   source: template
   template: >
-    {{ states('sensor.next_bin') | lower if now().isoweekday() >= 4 else 'none' }}
+    {{ is_state('sun.sun', 'below_horizon') or is_state('input_boolean.bedtime', 'on') }}
 ```
 
 ### Actions
@@ -206,7 +232,7 @@ when: {signal: lights, above: 0.5}         # level only; strict
 when: {signal: heating, above: 0.2, below: 0.8}
 when: {all: [night, motion]}
 when: {any: [doorbell, motion]}
-when: {not: {signal: bin, is: none}}
+when: {not: {signal: weather, is: clear}}
 ```
 
 Signals and enum options are checked when the scene loads, so a typo is an
@@ -228,10 +254,15 @@ vars:
 
 A rule list with no matching rule gives an empty string.
 
+Vars cannot read `items` signals; use a `repeat` layer.
+
 ## Placeholders
 
 `defs`, `style` and every layer's `svg` may contain `{{ name }}`, where `name`
 is a var or a signal. Values are XML-escaped. Booleans render as `on`/`off`.
+Inside a `repeat` layer, `{{ item.name }}`, `{{ item.color }}`,
+`{{ item.day }}`, `{{ item.date }}` and `{{ index }}` (0, 1, ...) are also
+available. Filters can be chained, e.g. `{{ item.name|upper|truncate:12 }}`.
 
 | Filter          | Effect                                  |
 |-----------------|-----------------------------------------|
@@ -255,6 +286,18 @@ layers:
     when: {signal: weather, in: [rain, storm]}
     svg: |
       <g class="fall"><rect y="-120" width="1600" height="1140" fill="url(#rain)"/></g>
+```
+
+A `repeat` layer is drawn once per item of an `items` signal, each copy
+shifted by `step` (x, y) from the previous one, up to `max` copies:
+
+```yaml
+  - id: bins
+    when: bins
+    repeat: {signal: bins, step: [88, 0], max: 5}
+    svg: |
+      <rect x="1140" y="746" width="70" height="100" fill="{{ item.color }}"/>
+      <text x="1175" y="790">{{ item.day }}</text>
 ```
 
 Each drawn layer becomes `<g id="layer-ID">…</g>`. The output is a standalone

@@ -13,6 +13,7 @@ from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
     ObjectSelector,
+    ObjectSelectorConfig,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -32,6 +33,29 @@ def _scene_selector(scenes: dict[str, Scene]) -> SelectSelector:
             options=[SelectOptionDict(value=s.id, label=s.name) for s in scenes.values()]
         )
     )
+
+
+# One row per item (e.g. per bin) of a calendar-driven items signal.
+_CALENDAR_ITEMS_SELECTOR = ObjectSelector(
+    ObjectSelectorConfig(
+        multiple=True,
+        label_field="name",
+        # Sub-field selectors must be given as configs: HA re-validates them.
+        fields={
+            "name": {"label": "Name", "required": True, "selector": {"text": {}}},
+            "calendar": {
+                "label": "Calendar",
+                "required": True,
+                "selector": {"entity": {"domain": "calendar"}},
+            },
+            "match": {
+                "label": "Event title contains (empty: any event)",
+                "selector": {"text": {"multiple": True}},
+            },
+            "color": {"label": "Colour", "selector": {"color_rgb": {}}},
+        },
+    )
+)
 
 
 def _signals_schema(
@@ -55,6 +79,8 @@ def _signals_schema(
             )
         elif key == "keywords":
             selector = TextSelector(TextSelectorConfig(multiple=True))
+        elif key == "items":
+            selector = _CALENDAR_ITEMS_SELECTOR
         else:
             selector = TemplateSelector()
         fields[vol.Optional(name, description={"suggested_value": suggested})] = selector

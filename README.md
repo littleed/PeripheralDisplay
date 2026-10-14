@@ -22,7 +22,7 @@ entities, feeds, templates or automations.
 | lights     | windows light up with the share of lights that are on       | `light`s / `switch`es              |
 | heating    | chimney smoke, denser with more heating                     | `climate` entities                 |
 | cinema     | the snug window flickers, two viewers silhouetted           | `media_player`s                    |
-| bin        | the bin out for Friday, in its colour and labelled          | a bin calendar or sensor           |
+| bins       | every bin due this week at the fence, in its colour, with its day | one entry per bin: name, calendar, title words, colour |
 | offline    | the telephone wire snaps and sparks                         | connectivity sensors (e.g. Ping)   |
 | alert      | a pigeon flies in with the matching headline                | keywords for Feed Reader items     |
 
@@ -54,7 +54,7 @@ that feed with the Feed Reader integration; then set the alert keywords (or
 
 Use **Configure** on the integration to switch scene (bindings for standard
 signals carry over) or to edit full bindings as YAML: longer motion holds,
-a boiler power sensor for heating, a template for bin day, and so on.
+a boiler power sensor for heating, a template for night, and so on.
 
 ## Automations
 
