@@ -1,0 +1,31 @@
+set_signal:
+  target:
+    entity:
+      integration: peripheral_display
+      domain: image
+  fields:
+    signal:
+      required: true
+      example: doorbell
+      selector:
+        text:
+    value:
+      required: true
+      example: "on"
+      selector:
+        text:
+    duration:
+      example: "00:01:00"
+      selector:
+        duration:
+
+clear_signal:
+  target:
+    entity:
+      integration: peripheral_display
+      domain: image
+  fields:
+    signal:
+      example: alert
+      selector:
+        text:

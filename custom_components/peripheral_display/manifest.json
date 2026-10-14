@@ -1,0 +1,12 @@
+{
+  "domain": "peripheral_display",
+  "name": "Peripheral Display",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["image"],
+  "documentation": "https://ampcode.com/@user_01M4FZWZB4M7JRXHGSJ3K6SXJV/PeripheralDisplay",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "requirements": [],
+  "version": "0.1.0"
+}

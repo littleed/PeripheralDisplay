@@ -1,0 +1,124 @@
+{
+  "config": {
+    "abort": {
+      "no_scenes": "No valid scene presets were found. Check the log for scene validation errors."
+    },
+    "error": {
+      "invalid_binding": "Invalid binding: {error}"
+    },
+    "step": {
+      "user": {
+        "title": "Create a Peripheral Display",
+        "description": "A Peripheral Display is an artwork whose details change with your home's state. Choose a scene preset; you can add your own in the `peripheral_display/scenes` folder of your configuration directory.",
+        "data": {
+          "name": "Name",
+          "scene": "Scene preset"
+        }
+      },
+      "signals": {
+        "title": "Bind {scene}",
+        "description": "Choose what drives each part of the scene. Leave a field empty to keep that part at rest; you can also drive any signal from automations with the `peripheral_display.set_signal` action.\n\n{signals}",
+        "data": {
+          "weather": "Weather",
+          "night": "Night",
+          "motion": "Motion sensors",
+          "doorbell": "Doorbells",
+          "lights": "Lights",
+          "heating": "Heating",
+          "cinema": "Cinema",
+          "bin": "Bin collection",
+          "offline": "Internet connectivity",
+          "alert": "Alert keywords"
+        },
+        "data_description": {
+          "weather": "A weather entity; its condition picks the sky.",
+          "night": "Defaults to the sun being below the horizon.",
+          "motion": "Shown while any is detecting motion, and for 2 minutes after.",
+          "doorbell": "Binary sensors or doorbell event entities; shown for 1 minute after a ring.",
+          "lights": "The share of these lights that are on.",
+          "heating": "Climate entities; shown while they report they are heating.",
+          "cinema": "Media players; shown while any is playing.",
+          "bin": "A sensor or calendar whose state names the bin being collected.",
+          "offline": "Connectivity binary sensors (e.g. Ping); the scene shows a fault when they are off.",
+          "alert": "Feed reader items (e.g. a Google Alerts RSS feed) whose title or summary contains one of these keywords."
+        }
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "invalid_binding": "Invalid binding: {error}"
+    },
+    "step": {
+      "init": {
+        "menu_options": {
+          "scene": "Change scene and entities",
+          "advanced": "Advanced bindings (YAML)"
+        }
+      },
+      "scene": {
+        "title": "Scene preset",
+        "data": {
+          "scene": "Scene preset"
+        }
+      },
+      "signals": {
+        "title": "Bind {scene}",
+        "description": "Choose what drives each part of the scene. Leave a field empty to keep that part at rest.\n\n{signals}",
+        "data": {
+          "weather": "Weather",
+          "night": "Night",
+          "motion": "Motion sensors",
+          "doorbell": "Doorbells",
+          "lights": "Lights",
+          "heating": "Heating",
+          "cinema": "Cinema",
+          "bin": "Bin collection",
+          "offline": "Internet connectivity",
+          "alert": "Alert keywords"
+        }
+      },
+      "advanced": {
+        "title": "Advanced bindings",
+        "description": "Override any part of a signal's binding, keyed by signal name. For example:\n\n```yaml\nheating:\n  source: numeric\n  entity: sensor.boiler_power\n  max: 24000\nmotion:\n  hold: 300\n```\n\nSources are state, numeric, map, event, template and manual. See docs/scene-language.md for every option."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "signals": {
+        "name": "Active signals"
+      }
+    }
+  },
+  "services": {
+    "set_signal": {
+      "name": "Set signal",
+      "description": "Forces a scene signal to a value, e.g. from an automation.",
+      "fields": {
+        "signal": {
+          "name": "Signal",
+          "description": "The signal name, e.g. doorbell, weather or alert."
+        },
+        "value": {
+          "name": "Value",
+          "description": "on/off for boolean signals, 0 to 1 for levels, an option for enums, or any text."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "How long to hold the value before returning to the binding. Leave empty to hold until cleared."
+        }
+      }
+    },
+    "clear_signal": {
+      "name": "Clear signal",
+      "description": "Returns a signal (or all signals) to its binding and clears held triggers and latched alerts.",
+      "fields": {
+        "signal": {
+          "name": "Signal",
+          "description": "The signal to clear. Leave empty to clear all."
+        }
+      }
+    }
+  }
+}
