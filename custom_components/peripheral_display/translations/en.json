@@ -23,11 +23,13 @@
           "night": "Night",
           "motion": "Motion sensors",
           "doorbell": "Doorbells",
+          "side_door": "Side door",
           "lights": "Lights",
           "heating": "Heating",
           "cinema": "Cinema",
           "bins": "Bins",
           "offline": "Internet connectivity",
+          "season": "Season",
           "alert": "Alert keywords"
         },
         "data_description": {
@@ -35,11 +37,13 @@
           "night": "Defaults to the sun being below the horizon.",
           "motion": "Motion binary sensors, motion event entities, or timestamp sensors such as Ring's Last motion; shown for 2 minutes after motion.",
           "doorbell": "Binary sensors, doorbell event entities, or timestamp sensors such as Ring's Last ding; shown for 1 minute after a ring.",
+          "side_door": "Door contacts, motion sensors, doorbells or Ring timestamp sensors at the side door; a visitor shows for 1 minute after.",
           "lights": "The share of these lights that are on.",
           "heating": "Climate entities; shown while they report they are heating.",
           "cinema": "Media players; shown while any is playing.",
           "bins": "Add one entry per bin: the name shown on it, the calendar with its collections, words in the event title that mean this bin (leave empty if the calendar only has this bin) and its colour. Every bin due in the next 7 days is shown.",
           "offline": "Connectivity binary sensors (e.g. Ping); the scene shows a fault when they are off.",
+          "season": "Picks the holiday theme: christmas through December, halloween from 24 October to 7 November. Edit the dates in this template if you like.",
           "alert": "Feed reader items (e.g. a Google Alerts RSS feed) whose title or summary contains one of these keywords."
         }
       }
@@ -70,11 +74,13 @@
           "night": "Night",
           "motion": "Motion sensors",
           "doorbell": "Doorbells",
+          "side_door": "Side door",
           "lights": "Lights",
           "heating": "Heating",
           "cinema": "Cinema",
           "bins": "Bins",
           "offline": "Internet connectivity",
+          "season": "Season",
           "alert": "Alert keywords"
         },
         "data_description": {
@@ -82,11 +88,13 @@
           "night": "Defaults to the sun being below the horizon.",
           "motion": "Motion binary sensors, motion event entities, or timestamp sensors such as Ring's Last motion; shown for 2 minutes after motion.",
           "doorbell": "Binary sensors, doorbell event entities, or timestamp sensors such as Ring's Last ding; shown for 1 minute after a ring.",
+          "side_door": "Door contacts, motion sensors, doorbells or Ring timestamp sensors at the side door; a visitor shows for 1 minute after.",
           "lights": "The share of these lights that are on.",
           "heating": "Climate entities; shown while they report they are heating.",
           "cinema": "Media players; shown while any is playing.",
           "bins": "Add one entry per bin: the name shown on it, the calendar with its collections, words in the event title that mean this bin (leave empty if the calendar only has this bin) and its colour. Every bin due in the next 7 days is shown.",
           "offline": "Connectivity binary sensors (e.g. Ping); the scene shows a fault when they are off.",
+          "season": "Picks the holiday theme: christmas through December, halloween from 24 October to 7 November. Edit the dates in this template if you like.",
           "alert": "Feed reader items (e.g. a Google Alerts RSS feed) whose title or summary contains one of these keywords."
         }
       },

@@ -48,10 +48,15 @@ def test_test_scene_renders_valid_svg_for_every_combination() -> None:
     weathers = scene.signals["weather"].options
     bins = [{"name": "Glass & <plastics>", "color": "#3e8e3a", "day": "FRI", "date": "2026-10-16"}] * 3
     seen: set[str] = set()
-    for weather, night, on in itertools.product(weathers, (False, True), (False, True)):
+    seasons = scene.signals["season"].options
+    for weather, night, season, on in itertools.product(
+        weathers, (False, True), seasons, (False, True)
+    ):
         values = {
             "weather": weather,
             "night": night,
+            "season": season,
+            "side_door": on,
             "bins": bins if on else [],
             "motion": on,
             "doorbell": on,

@@ -64,10 +64,12 @@ async def test_config_flow_creates_display(hass: HomeAssistant) -> None:
     # The scene asks for one input per bound signal; night is pre-filled.
     fields = {str(k): k for k in result["data_schema"].schema}
     assert set(fields) == {
-        "weather", "night", "motion", "doorbell", "lights",
-        "heating", "cinema", "bins", "offline", "alert",
+        "weather", "night", "motion", "doorbell", "side_door", "lights",
+        "heating", "cinema", "bins", "offline", "season", "alert",
     }
     assert fields["night"].description == {"suggested_value": ["sun.sun"]}
+    # The holiday rule is shown so it can be edited.
+    assert "d.month == 12" in fields["season"].description["suggested_value"]
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -301,6 +303,38 @@ async def test_alert_matches_feed_keywords(
         DOMAIN, "clear_signal", {"entity_id": IMAGE, "signal": "alert"}, blocking=True
     )
     assert _signals(hass)["alert"] == ""
+
+
+@pytest.mark.parametrize(
+    ("when", "season"),
+    [
+        ("2026-10-23 23:59:00", "none"),
+        ("2026-10-24 00:01:00", "halloween"),
+        ("2026-10-31 20:00:00", "halloween"),
+        ("2026-11-07 23:59:00", "halloween"),
+        ("2026-11-08 00:01:00", "none"),
+        ("2026-12-01 00:01:00", "christmas"),
+        ("2026-12-31 23:59:00", "christmas"),
+        ("2027-01-01 00:01:00", "none"),
+    ],
+)
+async def test_season_follows_the_date(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, when: str, season: str
+) -> None:
+    freezer.move_to(dt_util.as_utc(dt_util.parse_datetime(when).replace(tzinfo=dt_util.get_default_time_zone())))
+    await _setup(hass, {})
+    assert _signals(hass)["season"] == season
+
+
+async def test_season_changes_while_running(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    tz = dt_util.get_default_time_zone()
+    freezer.move_to(dt_util.as_utc(dt_util.parse_datetime("2026-11-30 23:58:00").replace(tzinfo=tz)))
+    await _setup(hass, {})
+    assert _signals(hass)["season"] == "none"
+    await _advance(hass, freezer, 180)
+    assert _signals(hass)["season"] == "christmas"
 
 
 async def test_set_signal_from_automation(

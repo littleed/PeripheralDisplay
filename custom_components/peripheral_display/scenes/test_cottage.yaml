@@ -4,12 +4,18 @@
 #   night    -> night palette, moon and stars, glowing windows
 #   motion   -> a fox trots through the garden; the security lamp floods at night
 #   doorbell -> a visitor at the door, the porch lamp lit and ringing
+#   side_door-> a visitor at the side door, its lamp lit
 #   lights   -> windows light up in proportion to the lights that are on
 #   heating  -> chimney smoke, denser with more heating
 #   cinema   -> the snug window flickers with two viewers silhouetted
 #   bins     -> every bin due in the coming week, in its own colour and with its day
 #   offline  -> the telephone wire snaps and sparks (a bird sits on it when online)
 #   alert    -> a pigeon flies in with the matching headline on a banner
+#   season   -> Halloween (pumpkins, bats, a full moon) and Christmas (roof
+#               lights, wreath, decorated tree, a snowman in the snow)
+#
+# Wind and storms bend the trees, blow leaves, push the smoke sideways and
+# send gusts across the sky.
 schema: peripheral-display/scene@1
 id: test_cottage
 name: Cottage in the Valley (test scene)
@@ -60,6 +66,14 @@ signals:
       source: state
       domains: [binary_sensor, event, sensor]
       hold: 60
+  side_door:
+    type: boolean
+    label: Side door
+    description: A visitor at the side door for a minute after it is triggered.
+    bind:
+      source: state
+      domains: [binary_sensor, event, sensor]
+      hold: 60
   lights:
     type: level
     label: Lights
@@ -100,6 +114,16 @@ signals:
       source: state
       domains: [binary_sensor]
       match: ["off", unavailable]
+  season:
+    type: enum
+    label: Season
+    description: Holiday decorations; Christmas through December, Halloween from 24 October to 7 November.
+    options: [none, halloween, christmas]
+    bind:
+      source: template
+      template: >-
+        {% set d = now() %}{% if d.month == 12 %}christmas{% elif (d.month == 10 and d.day >= 24)
+        or (d.month == 11 and d.day <= 7) %}halloween{% else %}none{% endif %}
   alert:
     type: text
     label: Alert
@@ -113,6 +137,8 @@ signals:
 
 vars:
   sky_top:
+    - when: {all: [night, {signal: season, is: halloween}, {signal: weather, in: [clear, partly, wind]}]}
+      value: "#1a0b2e"
     - when: {all: [night, {signal: weather, in: [cloudy, rain, storm, snow, fog]}]}
       value: "#151a28"
     - {when: night, value: "#070b26"}
@@ -121,6 +147,8 @@ vars:
     - {when: {signal: weather, in: [snow, fog]}, value: "#aab5c0"}
     - value: "#4fa3f7"
   sky_bottom:
+    - when: {all: [night, {signal: season, is: halloween}, {signal: weather, in: [clear, partly, wind]}]}
+      value: "#4a2350"
     - when: {all: [night, {signal: weather, in: [cloudy, rain, storm, snow, fog]}]}
       value: "#2b3242"
     - {when: night, value: "#2e2b5e"}
@@ -215,6 +243,15 @@ vars:
   sway:
     - {when: {signal: weather, in: [wind, storm]}, value: sway}
     - value: still
+  web:
+    - {when: night, value: "#e9e9f0"}
+    - value: "#6f665a"
+  bat_rim:
+    - {when: night, value: "#c9a3e6"}
+    - value: none
+  puff:
+    - {when: {signal: weather, in: [wind, storm]}, value: puff-wind}
+    - value: puff
   cloud_speed:
     - {when: {signal: weather, in: [wind, storm]}, value: 9s}
     - value: 50s
@@ -279,13 +316,21 @@ defs: |
   </pattern>
 
 style: |
-  .sway { animation: sway 2.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
-  @keyframes sway { from { transform: rotate(-2.5deg); } to { transform: rotate(3deg); } }
+  .sway { animation: sway 1.7s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
+  @keyframes sway { from { transform: rotate(-3deg); } to { transform: rotate(6deg); } }
   .drift { animation: drift linear infinite alternate; }
   @keyframes drift { from { transform: translateX(-70px); } to { transform: translateX(70px); } }
   .twinkle { animation: twinkle 3s ease-in-out infinite; }
   @keyframes twinkle { 50% { opacity: 0.25; } }
   .puff { transform-box: fill-box; transform-origin: center; animation: rise 6s ease-out infinite; opacity: 0; }
+  .puff-wind { transform-box: fill-box; transform-origin: center; animation: rise-wind 3s ease-out infinite; opacity: 0; }
+  @keyframes rise-wind { 0% { transform: translate(0, 0) scale(0.5); opacity: 0; } 15% { opacity: 0.9; } 100% { transform: translate(260px, -70px) scale(2.2); opacity: 0; } }
+  .gust { fill: none; stroke-dasharray: 22 200; animation: gust 2.4s ease-in infinite; }
+  @keyframes gust { 0% { stroke-dashoffset: 22; opacity: 0; } 15% { opacity: 0.85; } 85% { opacity: 0.85; } 100% { stroke-dashoffset: -100; opacity: 0; } }
+  .flit { animation: flit 14s linear infinite; }
+  @keyframes flit { from { transform: translate(-200px, 0); } 50% { transform: translate(900px, 40px); } to { transform: translate(1900px, -20px); } }
+  .wing { transform-box: fill-box; transform-origin: 50% 70%; animation: wing 0.25s ease-in-out infinite alternate; }
+  @keyframes wing { to { transform: scaleY(0.3); } }
   @keyframes rise { 0% { transform: translate(0, 0) scale(0.5); opacity: 0; } 15% { opacity: 0.9; } 100% { transform: translate(70px, -200px) scale(2.4); opacity: 0; } }
   .flicker { animation: flicker 2.2s steps(1) infinite; }
   @keyframes flicker { 0% { fill: #5b7cff; } 18% { fill: #c9d6ff; } 31% { fill: #6c45e8; } 47% { fill: #3fa0ff; } 63% { fill: #eef3ff; } 79% { fill: #4b63d6; } }
@@ -351,6 +396,13 @@ layers:
       <circle cx="1230" cy="170" r="110" fill="url(#moonglow)"/>
       <circle cx="1230" cy="170" r="46" fill="#f4f1de" mask="url(#crescent)"/>
 
+  - id: halloween_moon
+    when: {all: [night, {signal: season, is: halloween}, {signal: weather, in: [clear, partly, wind]}]}
+    svg: |
+      <circle cx="1230" cy="170" r="130" fill="url(#moonglow)"/>
+      <circle cx="1230" cy="170" r="62" fill="#ffe0a3"/>
+      <g fill="#f0c98a" opacity="0.6"><circle cx="1210" cy="150" r="10"/><circle cx="1250" cy="190" r="14"/><circle cx="1245" cy="145" r="6"/></g>
+
   - id: sky_flash
     when: {signal: weather, is: storm}
     svg: <rect width="1600" height="900" fill="#e8ecff" opacity="0.35" class="flash"/>
@@ -378,6 +430,15 @@ layers:
           <use href="#cloud" transform="translate(800 0) scale(2.2)"/>
           <use href="#cloud" transform="translate(1340 40) scale(1.7)"/>
         </g>
+      </g>
+
+  - id: bats
+    when: {signal: season, is: halloween}
+    svg: |
+      <g fill="#1b1220" stroke="{{ bat_rim }}" stroke-width="1.2">
+        <g class="flit"><g transform="translate(0 250) scale(1.8)"><path class="wing" d="M0,0 C-8,-10 -22,-10 -30,-2 C-24,-2 -20,2 -18,6 C-14,0 -8,2 -4,6 L0,2 L4,6 C8,2 14,0 18,6 C20,2 24,-2 30,-2 C22,-10 8,-10 0,0 Z"/></g></g>
+        <g class="flit" style="animation-delay:-5s"><g transform="translate(0 330) scale(1.3)"><path class="wing" d="M0,0 C-8,-10 -22,-10 -30,-2 C-24,-2 -20,2 -18,6 C-14,0 -8,2 -4,6 L0,2 L4,6 C8,2 14,0 18,6 C20,2 24,-2 30,-2 C22,-10 8,-10 0,0 Z"/></g></g>
+        <g class="flit" style="animation-delay:-9s"><g transform="translate(0 200) scale(1.5)"><path class="wing" d="M0,0 C-8,-10 -22,-10 -30,-2 C-24,-2 -20,2 -18,6 C-14,0 -8,2 -4,6 L0,2 L4,6 C8,2 14,0 18,6 C20,2 24,-2 30,-2 C22,-10 8,-10 0,0 Z"/></g></g>
       </g>
 
   - id: alert
@@ -423,9 +484,12 @@ layers:
     svg: |
       <rect x="865" y="440" width="36" height="70" fill="{{ brick }}"/>
       <rect x="859" y="431" width="48" height="11" fill="{{ brick }}"/>
-      <rect x="940" y="605" width="125" height="96" fill="{{ wall_shade }}"/>
+      <polygon points="940,601 1065,618 1065,701 940,701" fill="{{ wall_shade }}"/>
       <polygon points="932,592 1075,612 1075,623 932,603" fill="{{ roof }}"/>
-      <rect x="965" y="628" width="80" height="44" fill="{{ window_dark }}" stroke="{{ frame }}" stroke-width="4"/>
+      <rect x="952" y="632" width="58" height="40" fill="{{ window_dark }}" stroke="{{ frame }}" stroke-width="4"/>
+      <rect x="1024" y="644" width="30" height="57" fill="{{ door }}"/>
+      <circle cx="1048" cy="675" r="2" fill="#d9a441"/>
+      <rect x="1035" y="630" width="8" height="8" fill="#3b3b3b"/>
       <rect x="640" y="545" width="300" height="156" fill="{{ wall }}"/>
       <polygon points="618,550 790,418 962,550" fill="{{ roof }}"/>
       <polyline points="618,550 790,418 962,550" fill="none" stroke="#000" stroke-opacity="0.18" stroke-width="5"/>
@@ -450,22 +514,64 @@ layers:
         <ellipse cx="520" cy="512" rx="40" ry="10"/><ellipse cx="410" cy="560" rx="28" ry="8"/>
       </g>
 
+  - id: christmas_lights
+    when: {signal: season, is: christmas}
+    svg: |
+      <polyline points="621,553 790,424 959,553" fill="none" stroke="#1d1d1d" stroke-width="1.2"/>
+      <polyline points="935,610 1072,629" fill="none" stroke="#1d1d1d" stroke-width="1.2"/>
+      <g>
+        <circle cx="624.9" cy="548.7" r="4.5" fill="#ff4d4d" class="twinkle" style="animation-delay:-0.00s"/>
+        <circle cx="642.5" cy="535.2" r="4.5" fill="#3ddc84" class="twinkle" style="animation-delay:-0.37s"/>
+        <circle cx="660.0" cy="521.7" r="4.5" fill="#ffd23f" class="twinkle" style="animation-delay:-0.74s"/>
+        <circle cx="677.6" cy="508.2" r="4.5" fill="#4da6ff" class="twinkle" style="animation-delay:-1.11s"/>
+        <circle cx="695.2" cy="494.7" r="4.5" fill="#ff4d4d" class="twinkle" style="animation-delay:-1.48s"/>
+        <circle cx="712.8" cy="481.3" r="4.5" fill="#3ddc84" class="twinkle" style="animation-delay:-1.85s"/>
+        <circle cx="730.4" cy="467.8" r="4.5" fill="#ffd23f" class="twinkle" style="animation-delay:-2.22s"/>
+        <circle cx="748.0" cy="454.3" r="4.5" fill="#4da6ff" class="twinkle" style="animation-delay:-2.59s"/>
+        <circle cx="765.5" cy="440.8" r="4.5" fill="#ff4d4d" class="twinkle" style="animation-delay:-2.96s"/>
+        <circle cx="783.1" cy="427.3" r="4.5" fill="#3ddc84" class="twinkle" style="animation-delay:-0.33s"/>
+        <circle cx="814.5" cy="440.8" r="4.5" fill="#ffd23f" class="twinkle" style="animation-delay:-0.70s"/>
+        <circle cx="832.0" cy="454.3" r="4.5" fill="#4da6ff" class="twinkle" style="animation-delay:-1.07s"/>
+        <circle cx="849.6" cy="467.8" r="4.5" fill="#ff4d4d" class="twinkle" style="animation-delay:-1.44s"/>
+        <circle cx="867.2" cy="481.3" r="4.5" fill="#3ddc84" class="twinkle" style="animation-delay:-1.81s"/>
+        <circle cx="884.8" cy="494.7" r="4.5" fill="#ffd23f" class="twinkle" style="animation-delay:-2.18s"/>
+        <circle cx="902.4" cy="508.2" r="4.5" fill="#4da6ff" class="twinkle" style="animation-delay:-2.55s"/>
+        <circle cx="920.0" cy="521.7" r="4.5" fill="#ff4d4d" class="twinkle" style="animation-delay:-2.92s"/>
+        <circle cx="937.5" cy="535.2" r="4.5" fill="#3ddc84" class="twinkle" style="animation-delay:-0.29s"/>
+        <circle cx="955.1" cy="548.7" r="4.5" fill="#ffd23f" class="twinkle" style="animation-delay:-0.66s"/>
+        <circle cx="937.7" cy="607.8" r="4.5" fill="#4da6ff" class="twinkle" style="animation-delay:-1.03s"/>
+        <circle cx="964.0" cy="611.5" r="4.5" fill="#ff4d4d" class="twinkle" style="animation-delay:-1.40s"/>
+        <circle cx="990.3" cy="615.2" r="4.5" fill="#3ddc84" class="twinkle" style="animation-delay:-1.77s"/>
+        <circle cx="1016.7" cy="618.8" r="4.5" fill="#ffd23f" class="twinkle" style="animation-delay:-2.14s"/>
+        <circle cx="1043.0" cy="622.5" r="4.5" fill="#4da6ff" class="twinkle" style="animation-delay:-2.51s"/>
+        <circle cx="1069.3" cy="626.2" r="4.5" fill="#ff4d4d" class="twinkle" style="animation-delay:-2.88s"/>
+      </g>
+      <g class="{{ sway }}" style="animation-delay:-1.3s">
+        <polygon points="1171,500 1176,512 1189,512 1179,520 1183,533 1171,525 1159,533 1163,520 1153,512 1166,512" fill="#ffd23f"/>
+        <circle cx="1160" cy="588" r="5" fill="#ff4d4d" class="twinkle"/>
+        <circle cx="1186" cy="580" r="5" fill="#ffd23f" class="twinkle" style="animation-delay:-1s"/>
+        <circle cx="1171" cy="560" r="4.5" fill="#4da6ff" class="twinkle" style="animation-delay:-2s"/>
+        <circle cx="1143" cy="640" r="5.5" fill="#ffd23f" class="twinkle" style="animation-delay:-0.5s"/>
+        <circle cx="1198" cy="636" r="5.5" fill="#ff4d4d" class="twinkle" style="animation-delay:-1.5s"/>
+        <circle cx="1170" cy="618" r="5" fill="#3ddc84" class="twinkle" style="animation-delay:-2.5s"/>
+      </g>
+
   - id: smoke
     when: heating
     svg: |
       <g fill="{{ smoke }}" opacity="{{ smoke_opacity }}">
-        <circle cx="883" cy="420" r="14" class="puff"/>
-        <circle cx="883" cy="420" r="14" class="puff" style="animation-delay:-2s"/>
-        <circle cx="883" cy="420" r="14" class="puff" style="animation-delay:-4s"/>
+        <circle cx="883" cy="420" r="14" class="{{ puff }}"/>
+        <circle cx="883" cy="420" r="14" class="{{ puff }}" style="animation-delay:-2s"/>
+        <circle cx="883" cy="420" r="14" class="{{ puff }}" style="animation-delay:-4s"/>
       </g>
 
   - id: smoke_heavy
     when: {signal: heating, above: 0.5}
     svg: |
       <g fill="{{ smoke }}" opacity="{{ smoke_opacity }}">
-        <circle cx="880" cy="420" r="18" class="puff" style="animation-delay:-1s"/>
-        <circle cx="886" cy="420" r="16" class="puff" style="animation-delay:-3s"/>
-        <circle cx="882" cy="420" r="18" class="puff" style="animation-delay:-5s"/>
+        <circle cx="880" cy="420" r="18" class="{{ puff }}" style="animation-delay:-1s"/>
+        <circle cx="886" cy="420" r="16" class="{{ puff }}" style="animation-delay:-3s"/>
+        <circle cx="882" cy="420" r="18" class="{{ puff }}" style="animation-delay:-5s"/>
       </g>
 
   - id: light_left
@@ -494,9 +600,54 @@ layers:
   - id: cinema
     when: cinema
     svg: |
-      <rect x="950" y="615" width="110" height="70" fill="#6f8cff" opacity="{{ glow_opacity }}" filter="url(#blur)"/>
-      <rect x="965" y="628" width="80" height="44" class="flicker" stroke="{{ frame }}" stroke-width="4"/>
-      <g fill="#14121e"><path d="M980,672 a10,11 0 0 1 20,0 Z"/><path d="M1006,672 a11,13 0 0 1 22,0 Z"/></g>
+      <rect x="940" y="620" width="82" height="64" fill="#6f8cff" opacity="{{ glow_opacity }}" filter="url(#blur)"/>
+      <rect x="952" y="632" width="58" height="40" class="flicker" stroke="{{ frame }}" stroke-width="4"/>
+      <g fill="#14121e"><path d="M961,672 a9,10 0 0 1 18,0 Z"/><path d="M983,672 a10,12 0 0 1 20,0 Z"/></g>
+
+  - id: christmas_door
+    when: {signal: season, is: christmas}
+    svg: |
+      <circle cx="790" cy="652" r="10" fill="none" stroke="#1f6b35" stroke-width="6"/>
+      <g fill="#d7263d"><circle cx="784" cy="661" r="2.5"/><circle cx="796" cy="661" r="2.5"/><circle cx="790" cy="643" r="2.5"/></g>
+      <polygon points="846,650 876,650 861,608" fill="#1f5a32"/>
+      <polygon points="861,603 863,608 868,608 864,611 866,616 861,613 856,616 858,611 854,608 859,608" fill="#ffd23f"/>
+      <path d="M835,622 H905 M870,595 V650" stroke="{{ frame }}" stroke-width="3"/>
+
+  - id: snowman
+    when: {all: [{signal: season, is: christmas}, {signal: weather, is: snow}]}
+    svg: |
+      <g fill="#fbfdff">
+        <circle cx="590" cy="772" r="27"/><circle cx="590" cy="734" r="19"/><circle cx="590" cy="706" r="13"/>
+      </g>
+      <path d="M577,717 Q590,724 603,717 L603,724 Q590,731 577,724 Z" fill="#d7263d"/>
+      <rect x="597" y="719" width="7" height="20" fill="#d7263d"/>
+      <polygon points="591,706 607,709 591,711" fill="#f08a24"/>
+      <g fill="#222"><circle cx="585" cy="702" r="1.8"/><circle cx="595" cy="702" r="1.8"/><circle cx="590" cy="732" r="2.2"/><circle cx="590" cy="745" r="2.2"/><circle cx="590" cy="762" r="2.4"/></g>
+      <path d="M574,735 L548,718 M606,735 L630,716" stroke="#5a3b2a" stroke-width="3"/>
+
+  - id: pumpkins
+    when: {signal: season, is: halloween}
+    svg: |
+      <g filter="url(#blur)" fill="#ff9d2e" opacity="{{ glow_opacity }}"><circle cx="700" cy="704" r="22"/><circle cx="855" cy="708" r="18"/><circle cx="1012" cy="701" r="14"/></g>
+      <g transform="translate(700 704) scale(1.3)">
+        <ellipse rx="19" ry="14" fill="#e8721c"/><ellipse rx="8" ry="14" fill="#d2621a"/>
+        <rect x="-2" y="-19" width="4" height="7" fill="#3f6b2a"/>
+        <g fill="#ffd23f"><polygon points="-11,-4 -5,-4 -8,-9"/><polygon points="5,-4 11,-4 8,-9"/><path d="M-11,3 L-7,7 L-3,3 L0,7 L3,3 L7,7 L11,3 L8,9 L-8,9 Z"/></g>
+      </g>
+      <g transform="translate(855 708) scale(1.05)">
+        <ellipse rx="19" ry="14" fill="#e8721c"/><ellipse rx="8" ry="14" fill="#d2621a"/>
+        <rect x="-2" y="-19" width="4" height="7" fill="#3f6b2a"/>
+        <g fill="#ffd23f"><circle cx="-7" cy="-4" r="3"/><circle cx="7" cy="-4" r="3"/><path d="M-9,4 Q0,12 9,4 Z"/></g>
+      </g>
+      <g transform="translate(1012 701) scale(0.8)">
+        <ellipse rx="19" ry="14" fill="#e8721c"/><ellipse rx="8" ry="14" fill="#d2621a"/>
+        <rect x="-2" y="-19" width="4" height="7" fill="#3f6b2a"/>
+        <g fill="#ffd23f"><polygon points="-11,-4 -5,-4 -8,-9"/><polygon points="5,-4 11,-4 8,-9"/><path d="M-9,4 L9,4 L6,9 L-6,9 Z"/></g>
+      </g>
+      <g stroke="{{ web }}" stroke-width="1.2" fill="none" opacity="0.85">
+        <path d="M640,546 L640,600 M640,546 L694,546 M640,546 L680,586 M640,546 L662,596 M640,546 L690,566"/>
+        <path d="M640,562 Q648,560 651,557 Q656,553 656,546 M640,578 Q656,576 662,570 Q670,562 672,546 M640,592 Q664,590 674,580 Q686,568 688,546"/>
+      </g>
 
   - id: motion
     when: motion
@@ -540,6 +691,22 @@ layers:
     svg: |
       <line x1="757" y1="624" x2="757" y2="664" stroke="#222" stroke-width="2"/>
       <path d="M723,628 A34,24 0 0 1 791,628 Z" fill="#c94f3d"/>
+
+  - id: side_door
+    when: side_door
+    svg: |
+      <circle cx="1039" cy="639" r="24" fill="#ffd27a" opacity="0.55" filter="url(#blur)"/>
+      <circle cx="1039" cy="639" r="3.5" fill="#ffe7a8"/>
+      <g fill="{{ visitor }}">
+        <circle cx="1084" cy="644" r="11"/>
+        <path d="M1067,716 L1070,670 Q1084,654 1098,670 L1101,716 Z"/>
+      </g>
+
+  - id: side_door_umbrella
+    when: {all: [side_door, {signal: weather, in: [rain, storm]}]}
+    svg: |
+      <line x1="1084" y1="626" x2="1084" y2="666" stroke="#222" stroke-width="2"/>
+      <path d="M1050,630 A34,24 0 0 1 1118,630 Z" fill="#3d6fb6"/>
 
   - id: fence
     svg: |
@@ -610,10 +777,23 @@ layers:
     when: {signal: weather, is: storm}
     svg: <polygon points="430,180 395,305 422,305 382,440 456,282 428,282 458,180" fill="#fffbd0" class="flash"/>
 
+  - id: gusts
+    when: {signal: weather, in: [wind, storm]}
+    svg: |
+      <g stroke="#ffffff" stroke-width="3" stroke-linecap="round">
+        <path class="gust" pathLength="100" d="M-40,250 C200,220 330,290 520,250 S820,200 980,250 C1080,280 1100,230 1060,215 C1030,205 1010,235 1040,245"/>
+        <path class="gust" pathLength="100" style="animation-delay:-0.8s" d="M300,380 C500,350 650,410 860,370 S1200,330 1420,380 C1500,400 1520,350 1485,340 C1455,333 1445,362 1475,368"/>
+        <path class="gust" pathLength="100" style="animation-delay:-1.6s" d="M-60,520 C150,500 300,550 480,515 S760,480 900,520"/>
+        <path class="gust" pathLength="100" style="animation-delay:-1.2s" d="M1000,140 C1150,120 1280,170 1450,135 S1620,110 1700,140"/>
+      </g>
+
   - id: leaves
     when: {signal: weather, in: [wind, storm]}
     svg: |
       <g fill="#c9822f">
+        <ellipse cx="0" cy="450" rx="11" ry="5" class="leaf" style="animation-delay:-0.7s" fill="#d9a441"/>
+        <ellipse cx="0" cy="700" rx="10" ry="4.5" class="leaf" style="animation-delay:-2s"/>
+        <ellipse cx="0" cy="580" rx="9" ry="4" class="leaf" style="animation-delay:-3.2s" fill="#b5532a"/>
         <ellipse cx="0" cy="380" rx="11" ry="5" class="leaf"/>
         <ellipse cx="0" cy="520" rx="10" ry="4.5" class="leaf" style="animation-delay:-1.4s" fill="#9fb03a"/>
         <ellipse cx="0" cy="640" rx="11" ry="5" class="leaf" style="animation-delay:-2.6s"/>

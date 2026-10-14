@@ -76,11 +76,13 @@ form shows friendly labels:
 | `night`    | boolean | it is dark outside                              |
 | `motion`   | boolean | a motion sensor has triggered recently          |
 | `doorbell` | boolean | a doorbell rang recently                        |
+| `side_door`| boolean | someone is at the side door                     |
 | `lights`   | level   | the share of chosen lights that are on          |
 | `heating`  | level   | how much heating is running                     |
 | `cinema`   | boolean | a film is playing                               |
 | `bins`     | items   | the bins due for collection in the coming week  |
 | `offline`  | boolean | the internet connection is down                 |
+| `season`   | enum    | `none halloween christmas`                      |
 | `alert`    | text    | headline of a matching news or Google alert     |
 
 ## Bindings

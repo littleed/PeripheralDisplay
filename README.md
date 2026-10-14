@@ -15,16 +15,18 @@ entities, feeds, templates or automations.
 
 | Signal     | In the picture                                              | Bind it to                         |
 |------------|-------------------------------------------------------------|------------------------------------|
-| weather    | sky colour, sun, clouds, rain, lightning, snow, fog, wind   | a `weather` entity                 |
+| weather    | sky colour, sun, clouds, rain, lightning, snow, fog; wind bends the trees, blows leaves and smoke, and sends gusts across the sky | a `weather` entity |
 | night      | night palette, moon and stars, glowing windows              | `sun.sun` (pre-filled)             |
 | motion     | a fox trots through the garden; the security lamp floods    | motion sensors, or Ring's *Last motion* |
 | doorbell   | a visitor at the door, porch lamp lit and ringing           | doorbell sensors, `event`s, or Ring's *Last ding* |
+| side door  | a visitor at the side door, its lamp lit                    | door, motion or doorbell sensors at the side door |
 | lights     | windows light up with the share of lights that are on       | `light`s / `switch`es              |
 | heating    | chimney smoke, denser with more heating                     | `climate` entities                 |
 | cinema     | the snug window flickers, two viewers silhouetted           | `media_player`s                    |
 | bins       | every bin due this week at the fence, in its colour, with its day | one entry per bin: name, calendar, title words, colour |
 | offline    | the telephone wire snaps and sparks                         | connectivity sensors (e.g. Ping)   |
 | alert      | a pigeon flies in with the matching headline                | keywords for Feed Reader items     |
+| season     | Halloween: pumpkins, bats, cobweb, full moon. Christmas: roof lights, wreath, decorated tree, a snowman when it snows | automatic: December, and 24 Oct – 7 Nov (editable) |
 
 ## Install
 

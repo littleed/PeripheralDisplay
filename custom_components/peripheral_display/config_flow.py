@@ -71,6 +71,8 @@ def _signals_schema(
         suggested = selections.get(name)
         if suggested is None and key == "entities":
             suggested = [e for e in bind.get("entities", []) if hass.states.get(e)]
+        if suggested is None and key == "template":
+            suggested = bind.get("template")
         if key in ("entities", "entity"):
             selector: Any = EntitySelector(
                 EntitySelectorConfig(
