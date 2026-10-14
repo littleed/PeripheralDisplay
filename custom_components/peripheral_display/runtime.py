@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timedelta
+import logging
 from typing import Any
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
@@ -15,20 +16,25 @@ from homeassistant.core import (
     State,
     callback,
 )
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import (
     TrackTemplate,
     TrackTemplateResult,
     async_track_point_in_utc_time,
     async_track_state_change_event,
     async_track_template_result,
+    async_track_time_interval,
 )
 from homeassistant.helpers.template import Template
 from homeassistant.util import dt as dt_util
 
 from .language import Scene, Signal
 
+_LOGGER = logging.getLogger(__name__)
 _INVALID = (STATE_UNAVAILABLE, STATE_UNKNOWN)
 DEFAULT_MOMENTARY_HOLD = 30.0
+DEFAULT_CALENDAR_DAYS = 7
+CALENDAR_REFRESH = timedelta(minutes=15)
 
 
 def _read(binding: dict[str, Any], state: State | None) -> Any:
@@ -49,9 +55,46 @@ def _matches(binding: dict[str, Any], state: State | None) -> bool:
     return value is not None and str(value).lower() in match
 
 
-def _momentary(binding: dict[str, Any], entity_id: str) -> bool:
-    """Event entities (and ``@changed``) trigger on every new state."""
-    return entity_id.startswith("event.") or "@changed" in binding.get("match", [])
+def _is_timestamp(entity_id: str, state: State | None) -> bool:
+    """Event entities and timestamp sensors (e.g. Ring's "Last ding")."""
+    return entity_id.startswith("event.") or (
+        state is not None and state.attributes.get("device_class") == "timestamp"
+    )
+
+
+def _momentary(binding: dict[str, Any], entity_id: str, state: State | None) -> bool:
+    """Timestamp entities (and ``@changed``) trigger on every new state."""
+    return _is_timestamp(entity_id, state) or "@changed" in binding.get("match", [])
+
+
+def _fired_at(entity_id: str, state: State | None) -> datetime | None:
+    """The time a timestamp entity says it last fired."""
+    if not _is_timestamp(entity_id, state) or state.state in _INVALID:
+        return None
+    when = dt_util.parse_datetime(state.state)
+    return dt_util.as_utc(when) if when else None
+
+
+def _map_option(binding: dict[str, Any], value: str) -> str | None:
+    """The option whose keyword matches; the longest keyword wins ties."""
+    value = value.lower()
+    contains = binding.get("compare", "exact") == "contains"
+    best: tuple[int, int, str] | None = None
+    for index, (option, patterns) in enumerate(binding["map"].items()):
+        for pattern in patterns:
+            pattern = pattern.lower()
+            if (pattern in value) if contains else (pattern == value):
+                candidate = (len(pattern), -index, option)
+                best = max(best, candidate) if best else candidate
+    return best[2] if best else None
+
+
+def _is_calendar_map(binding: dict[str, Any]) -> bool:
+    return (
+        binding["source"] == "map"
+        and binding["entity"].startswith("calendar.")
+        and "attribute" not in binding
+    )
 
 
 class DisplayRuntime:
@@ -71,6 +114,8 @@ class DisplayRuntime:
         self._last_active: dict[tuple[str, str], datetime] = {}
         self._events: dict[str, tuple[datetime, str]] = {}
         self._templates: dict[str, Any] = {}
+        self._calendars: dict[str, list[dict[str, Any]] | None] = {}
+        self._cleared: dict[str, datetime] = {}
         self._timer: CALLBACK_TYPE | None = None
         self._next_expiry: datetime | None = None
 
@@ -84,6 +129,15 @@ class DisplayRuntime:
                 watched.update(binding["entities"])
             elif source in ("numeric", "map"):
                 watched.add(binding["entity"])
+                if _is_calendar_map(binding):
+                    self._refresh_calendar(name)
+                    self._unsubs.append(
+                        async_track_time_interval(
+                            self.hass,
+                            callback(lambda _now, name=name: self._refresh_calendar(name)),
+                            CALENDAR_REFRESH,
+                        )
+                    )
             elif source == "event":
                 self._unsubs.append(
                     self.hass.bus.async_listen(
@@ -139,6 +193,7 @@ class DisplayRuntime:
         for sig in names:
             self._overrides.pop(sig, None)
             self._events.pop(sig, None)
+            self._cleared[sig] = dt_util.utcnow()
             for key in [k for k in self._last_active if k[0] == sig]:
                 del self._last_active[key]
         self._recompute()
@@ -151,9 +206,11 @@ class DisplayRuntime:
         old, new = event.data["old_state"], event.data["new_state"]
         now = dt_util.utcnow()
         for name, binding in self.bindings.items():
+            if _is_calendar_map(binding) and binding["entity"] == entity_id:
+                self._refresh_calendar(name)
             if binding["source"] != "state" or entity_id not in binding["entities"]:
                 continue
-            if _momentary(binding, entity_id):
+            if _momentary(binding, entity_id, new):
                 if (
                     old is not None
                     and new is not None
@@ -195,6 +252,34 @@ class DisplayRuntime:
         self._recompute()
 
     @callback
+    def _refresh_calendar(self, name: str) -> None:
+        self.hass.async_create_task(self._async_refresh_calendar(name), eager_start=True)
+
+    async def _async_refresh_calendar(self, name: str) -> None:
+        """Fetch the calendar's events for the coming days."""
+        binding = self.bindings[name]
+        entity_id = binding["entity"]
+        try:
+            response = await self.hass.services.async_call(
+                "calendar",
+                "get_events",
+                {
+                    "entity_id": entity_id,
+                    "duration": {"days": binding.get("days", DEFAULT_CALENDAR_DAYS)},
+                },
+                blocking=True,
+                return_response=True,
+            )
+        except HomeAssistantError as err:
+            # The calendar may not be loaded yet; its first state change retries.
+            _LOGGER.debug("Could not read %s: %s", entity_id, err)
+            events = None
+        else:
+            events = (response or {}).get(entity_id, {}).get("events", [])
+        self._calendars[name] = events
+        self._recompute()
+
+    @callback
     def _on_timer(self, _now: datetime) -> None:
         self._timer = None
         self._recompute()
@@ -205,8 +290,7 @@ class DisplayRuntime:
         if self._next_expiry is None or when < self._next_expiry:
             self._next_expiry = when
 
-    def _held(self, key: tuple[str, str], hold: float, now: datetime) -> bool:
-        last = self._last_active.get(key)
+    def _held(self, last: datetime | None, hold: float, now: datetime) -> bool:
         if last is None or not hold:
             return False
         until = last + timedelta(seconds=hold)
@@ -222,10 +306,21 @@ class DisplayRuntime:
             active = []
             for entity_id in binding["entities"]:
                 state = self.hass.states.get(entity_id)
-                momentary = _momentary(binding, entity_id)
+                momentary = _momentary(binding, entity_id, state)
                 hold = binding.get("hold") or (DEFAULT_MOMENTARY_HOLD if momentary else 0)
+                # Triggered when HA saw the change or when the entity says it
+                # fired, whichever is later, and not before a clear_signal.
+                cleared = self._cleared.get(sig.name)
+                triggers = [
+                    t
+                    for t in (
+                        self._last_active.get((sig.name, entity_id)),
+                        _fired_at(entity_id, state),
+                    )
+                    if t and (cleared is None or t > cleared)
+                ]
                 on = (not momentary and _matches(binding, state)) or self._held(
-                    (sig.name, entity_id), hold, now
+                    max(triggers, default=None), hold, now
                 )
                 if on:
                     active.append(
@@ -253,20 +348,18 @@ class DisplayRuntime:
             level = min(1.0, max(0.0, level))
             return 1 - level if binding.get("invert") else level
         if source == "map":
-            if binding["entity"].startswith("calendar.") and "attribute" not in binding:
-                # A calendar's state is on/off; its next event is in 'message'.
-                binding = {**binding, "attribute": "message"}
+            if _is_calendar_map(binding):
+                # The earliest day with a matching event wins; on the same day
+                # the option listed first in the map wins.
+                options = list(binding["map"])
+                matches = [
+                    (str(event.get("start", ""))[:10], options.index(option), option)
+                    for event in self._calendars.get(sig.name) or []
+                    if (option := _map_option(binding, str(event.get("summary", ""))))
+                ]
+                return min(matches)[2] if matches else None
             value = _read(binding, self.hass.states.get(binding["entity"]))
-            if value is None:
-                return None
-            value = str(value).lower()
-            contains = binding.get("compare", "exact") == "contains"
-            for option, patterns in binding["map"].items():
-                for pattern in patterns:
-                    pattern = pattern.lower()
-                    if (pattern in value) if contains else (pattern == value):
-                        return option
-            return None
+            return None if value is None else _map_option(binding, str(value))
         if source == "event":
             latched = self._events.get(sig.name)
             if latched is None:

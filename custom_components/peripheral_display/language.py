@@ -63,6 +63,7 @@ BINDING_SCHEMA = vol.Schema(
         vol.Optional("max"): vol.Coerce(float),
         vol.Optional("map"): {str: vol.All(vol.Coerce(list), [vol.Coerce(str)])},
         vol.Optional("compare"): vol.In(("exact", "contains")),
+        vol.Optional("days"): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
         vol.Optional("event_type"): str,
         vol.Optional("data"): dict,
         vol.Optional("keywords"): vol.All(vol.Coerce(list), [vol.Coerce(str)]),

@@ -50,7 +50,7 @@ signals:
     description: A fox in the garden while motion is detected, and for 2 minutes after.
     bind:
       source: state
-      domains: [binary_sensor]
+      domains: [binary_sensor, event, sensor]
       hold: 120
   doorbell:
     type: boolean
@@ -58,7 +58,7 @@ signals:
     description: A visitor at the door for a minute after a ring.
     bind:
       source: state
-      domains: [binary_sensor, event]
+      domains: [binary_sensor, event, sensor]
       hold: 60
   lights:
     type: level
@@ -87,17 +87,19 @@ signals:
   bin:
     type: enum
     label: Bin day
-    description: The bin out for Friday's collection.
+    description: The bin out for the next collection in the coming week.
     options: [none, general, recycling, garden, food]
     bind:
       source: map
-      domains: [sensor, calendar, input_select]
+      domains: [calendar, sensor, input_select]
       compare: contains
+      days: 7
+      # Listed in priority order for collections on the same day.
       map:
-        recycling: [recycl, blue]
-        garden: [garden, green]
+        recycling: [recycl, blue, paper, plastic, glass, mixed]
+        garden: [garden, green, brown]
+        general: [general, refuse, rubbish, landfill, residual, household, non-recycl, black, grey, gray]
         food: [food, caddy]
-        general: [general, refuse, rubbish, landfill, black]
   offline:
     type: boolean
     label: Internet offline

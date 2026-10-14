@@ -90,7 +90,7 @@ at its default.
 |------------|-------------------------|----------------|------|
 | `state`    | boolean, level, text    | `entities`     | `match`, `attribute`, `mode`, `hold`, `invert` |
 | `numeric`  | level, boolean, text    | `entity`       | `attribute`, `min`, `max`, `invert` |
-| `map`      | enum                    | `entity`       | `map`, `compare`, `attribute` |
+| `map`      | enum                    | `entity`       | `map`, `compare`, `attribute`, `days` |
 | `event`    | boolean, level, text    | `keywords`     | `event_type`, `data`, `fields`, `text_field`, `hold` |
 | `template` | any                     | `template`     | |
 | `manual`   | any                     | nothing        | only set by actions |
@@ -112,10 +112,14 @@ setup form's entity picker.
 Value: boolean = any/all active; level = share of entities active;
 text = names of the active entities.
 
-**Momentary entities.** `event.*` entities (e.g. doorbell events) and any
-binding whose `match` contains `@changed` are triggered by each new state
-rather than by being in one. They are active for `hold` seconds (30 if unset).
-A state already present at start-up does not count.
+**Momentary entities.** Timestamp entities, meaning `event.*` entities (e.g.
+doorbell events) and sensors with the `timestamp` device class (e.g. Ring's
+*Last ding*, *Last motion* and *Last activity*), are triggered by each new
+time rather than by being in a state; so is any binding whose `match`
+contains `@changed`. They stay active for `hold` seconds (30 if unset),
+counted from when Home Assistant saw the change or from the time the entity
+reports, whichever is later. An old time present at start-up does not count,
+and `clear_signal` dismisses the current trigger.
 
 ### `numeric`: a number scaled to 0–1
 
@@ -128,16 +132,22 @@ heating: {source: numeric, entity: sensor.boiler_power, max: 24000}
 
 ### `map`: text to an enum option
 
-`map` lists, per option, the values that select it. The first matching option
-wins; no match gives the signal's default. `compare: exact` (default) or
-`contains` (substring). A `calendar.*` entity is read from its `message`
-attribute, so the next event's title picks the option.
+`map` lists, per option, the values that select it; no match gives the
+signal's default. `compare: exact` (default) or `contains` (substring). With
+`contains`, the longest matching keyword wins, so `non-recycl` beats `recycl`
+for "Non-recyclable waste".
+
+A `calendar.*` entity is searched instead: every event in the next `days`
+days (default 7) is matched by its title, and the earliest day with a match
+wins. When several bins share that day, the option listed first in `map`
+wins. Events are re-read when the calendar changes and every 15 minutes.
 
 ```yaml
 bin:
   source: map
   entity: calendar.bins
   compare: contains
+  days: 7
   map: {recycling: [recycl, blue], garden: [garden, green]}
 ```
 

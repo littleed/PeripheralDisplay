@@ -17,12 +17,12 @@ entities, feeds, templates or automations.
 |------------|-------------------------------------------------------------|------------------------------------|
 | weather    | sky colour, sun, clouds, rain, lightning, snow, fog, wind   | a `weather` entity                 |
 | night      | night palette, moon and stars, glowing windows              | `sun.sun` (pre-filled)             |
-| motion     | a fox trots through the garden; the security lamp floods    | motion `binary_sensor`s            |
-| doorbell   | a visitor at the door, porch lamp lit and ringing           | doorbell sensors or `event`s       |
+| motion     | a fox trots through the garden; the security lamp floods    | motion sensors, or Ring's *Last motion* |
+| doorbell   | a visitor at the door, porch lamp lit and ringing           | doorbell sensors, `event`s, or Ring's *Last ding* |
 | lights     | windows light up with the share of lights that are on       | `light`s / `switch`es              |
 | heating    | chimney smoke, denser with more heating                     | `climate` entities                 |
 | cinema     | the snug window flickers, two viewers silhouetted           | `media_player`s                    |
-| bin        | the bin out for Friday, in its colour and labelled          | a bin sensor or calendar           |
+| bin        | the bin out for Friday, in its colour and labelled          | a bin calendar or sensor           |
 | offline    | the telephone wire snaps and sparks                         | connectivity sensors (e.g. Ping)   |
 | alert      | a pigeon flies in with the matching headline                | keywords for Feed Reader items     |
 

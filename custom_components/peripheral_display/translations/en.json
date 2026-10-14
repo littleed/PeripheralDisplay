@@ -33,12 +33,12 @@
         "data_description": {
           "weather": "A weather entity; its condition picks the sky.",
           "night": "Defaults to the sun being below the horizon.",
-          "motion": "Shown while any is detecting motion, and for 2 minutes after.",
-          "doorbell": "Binary sensors or doorbell event entities; shown for 1 minute after a ring.",
+          "motion": "Motion binary sensors, motion event entities, or timestamp sensors such as Ring's Last motion; shown for 2 minutes after motion.",
+          "doorbell": "Binary sensors, doorbell event entities, or timestamp sensors such as Ring's Last ding; shown for 1 minute after a ring.",
           "lights": "The share of these lights that are on.",
           "heating": "Climate entities; shown while they report they are heating.",
           "cinema": "Media players; shown while any is playing.",
-          "bin": "A sensor or calendar whose state names the bin being collected.",
+          "bin": "A bin calendar (its events in the next 7 days are searched) or a sensor naming the bin.",
           "offline": "Connectivity binary sensors (e.g. Ping); the scene shows a fault when they are off.",
           "alert": "Feed reader items (e.g. a Google Alerts RSS feed) whose title or summary contains one of these keywords."
         }

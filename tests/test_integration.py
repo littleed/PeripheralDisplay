@@ -1,6 +1,6 @@
 """Peripheral Display running inside Home Assistant."""
 
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
@@ -8,12 +8,16 @@ import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
+    setup_test_component_platform,
 )
 
 from homeassistant import config_entries
+from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.setup import async_setup_component
+from homeassistant.util import dt as dt_util
 
 from custom_components.peripheral_display.const import DOMAIN
 
@@ -84,7 +88,7 @@ async def test_signals_follow_home_state(hass: HomeAssistant, hass_client) -> No
     hass.states.async_set("light.hall", "off")
     hass.states.async_set("climate.house", "heat", {"hvac_action": "idle"})
     hass.states.async_set("media_player.cinema", "paused")
-    hass.states.async_set("calendar.bins", "off", {"message": "Garden waste collection"})
+    hass.states.async_set("sensor.bins", "Garden waste in 2 days")
     hass.states.async_set("binary_sensor.ping", "on")
     await _setup(
         hass,
@@ -93,7 +97,7 @@ async def test_signals_follow_home_state(hass: HomeAssistant, hass_client) -> No
             "lights": ["light.kitchen", "light.hall"],
             "heating": ["climate.house"],
             "cinema": ["media_player.cinema"],
-            "bin": "calendar.bins",
+            "bin": "sensor.bins",
             "offline": ["binary_sensor.ping"],
         },
     )
@@ -102,7 +106,6 @@ async def test_signals_follow_home_state(hass: HomeAssistant, hass_client) -> No
     assert values["lights"] == 0.5
     assert values["heating"] == 0.0
     assert values["cinema"] is False
-    # Calendars are read from their next event's message.
     assert values["bin"] == "garden"
     assert values["offline"] is False
 
@@ -152,19 +155,98 @@ async def test_motion_holds_after_clearing(
     assert _signals(hass)["motion"] is False
 
 
-async def test_doorbell_event_entity_is_momentary(
+async def test_doorbell_from_ring_last_ding_timestamp(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
-    hass.states.async_set("event.front_door", "2026-10-14T08:00:00+00:00")
-    await _setup(hass, {"doorbell": ["event.front_door"]})
-    # An existing last-press timestamp is not a new ring.
+    """Ring reports rings as a timestamp sensor that updates after a delay."""
+    ring = "sensor.front_door_last_ding"
+    attrs = {"device_class": "timestamp", "friendly_name": "Front Door Last ding"}
+    hass.states.async_set(ring, (dt_util.utcnow() - timedelta(hours=3)).isoformat(), attrs)
+    entry = await _setup(hass, {"doorbell": [ring]})
+    # An old ring present at start-up does not count.
     assert _signals(hass)["doorbell"] is False
 
-    hass.states.async_set("event.front_door", "2026-10-14T09:00:00+00:00")
+    # Ring's poll reports a ring from 40 s ago; the hold runs from when HA saw it.
+    hass.states.async_set(ring, (dt_util.utcnow() - timedelta(seconds=40)).isoformat(), attrs)
     await hass.async_block_till_done()
     assert _signals(hass)["doorbell"] is True
-    await _advance(hass, freezer, 61)
+    await _advance(hass, freezer, 50)
+    assert _signals(hass)["doorbell"] is True
+    await _advance(hass, freezer, 15)
     assert _signals(hass)["doorbell"] is False
+
+    # clear_signal dismisses a ring even though its timestamp is recent.
+    hass.states.async_set(ring, dt_util.utcnow().isoformat(), attrs)
+    await hass.async_block_till_done()
+    assert _signals(hass)["doorbell"] is True
+    await hass.services.async_call(
+        DOMAIN, "clear_signal", {"entity_id": IMAGE, "signal": "doorbell"}, blocking=True
+    )
+    assert _signals(hass)["doorbell"] is False
+
+    # A ring during a restart still shows afterwards, from its timestamp.
+    await _advance(hass, freezer, 5)
+    hass.states.async_set(ring, (dt_util.utcnow() - timedelta(seconds=10)).isoformat(), attrs)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _signals(hass)["doorbell"] is True
+
+
+class BinCalendar(CalendarEntity):
+    """A calendar whose events can be changed by the test."""
+
+    _attr_name = "Bins"
+
+    def __init__(self) -> None:
+        """Start empty."""
+        self.items: list[CalendarEvent] = []
+
+    @property
+    def event(self) -> CalendarEvent | None:
+        """The next event."""
+        return min(self.items, key=lambda e: e.start_datetime_local, default=None)
+
+    async def async_get_events(self, hass, start_date, end_date) -> list[CalendarEvent]:
+        """Events overlapping the window."""
+        return [
+            e
+            for e in self.items
+            if e.start_datetime_local < end_date and e.end_datetime_local > start_date
+        ]
+
+
+def _all_day(day: str, summary: str) -> CalendarEvent:
+    start = date.fromisoformat(day)
+    return CalendarEvent(start=start, end=start + timedelta(days=1), summary=summary)
+
+
+async def test_bin_from_calendar_events(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-10-14 12:00:00+00:00")  # a Wednesday
+    calendar = BinCalendar()
+    calendar.items = [
+        _all_day("2026-10-15", "Dentist"),
+        _all_day("2026-10-16", "Food waste"),
+        _all_day("2026-10-16", "Blue bin recycling collection"),
+        _all_day("2026-10-23", "Non-recyclable waste"),
+    ]
+    setup_test_component_platform(hass, "calendar", [calendar])
+    assert await async_setup_component(hass, "calendar", {"calendar": {"platform": "test"}})
+    await hass.async_block_till_done()
+
+    await _setup(hass, {"bin": "calendar.bins"})
+    # Not the next event (Dentist), and recycling outranks food on the same day.
+    assert _signals(hass)["bin"] == "recycling"
+
+    # Friday's collection is cancelled; the 23rd is beyond the 7-day window.
+    calendar.items = [calendar.items[0], calendar.items[3]]
+    await _advance(hass, freezer, 15 * 60)
+    assert _signals(hass)["bin"] == "none"
+
+    # By Saturday the 23rd is within the window; 'non-recycl' beats 'recycl'.
+    await _advance(hass, freezer, 3 * 24 * 3600)
+    assert _signals(hass)["bin"] == "general"
 
 
 async def test_alert_matches_feed_keywords(
