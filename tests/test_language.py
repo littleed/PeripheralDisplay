@@ -10,6 +10,7 @@ import pytest
 from custom_components.peripheral_display.language import (
     SceneError,
     load_scene_file,
+    load_scenes,
     parse_scene,
     resolve_binding,
 )
@@ -167,3 +168,13 @@ def test_resolve_binding() -> None:
     ]
     with pytest.raises(SceneError):
         resolve_binding(bins, [{"name": "Recycling", "calendar": "sensor.bins"}])
+
+
+def test_load_scenes_skips_unreadable_files(tmp_path: Path) -> None:
+    """One bad file in the user's scenes folder must not hide the others."""
+    (tmp_path / "a_binary.yaml").write_bytes(b"\xff\xfe\x00 not text")
+    (tmp_path / "b_empty.yaml").write_text("")
+    (tmp_path / "c_cottage.yaml").write_text(TEST_SCENE.read_text())
+    scenes, errors = load_scenes(tmp_path)
+    assert list(scenes) == ["test_cottage"]
+    assert [e.split(":")[0] for e in errors] == ["a_binary.yaml", "b_empty.yaml"]

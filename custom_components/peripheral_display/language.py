@@ -568,7 +568,7 @@ def load_scene_file(path: Path) -> Scene:
     """Load and validate a scene from a YAML file."""
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as err:
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as err:
         raise SceneError(f"{path.name}: {err}") from err
     try:
         return parse_scene(data)

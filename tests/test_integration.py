@@ -168,7 +168,7 @@ async def test_motion_holds_after_clearing(
 
 
 async def test_doorbell_from_ring_last_ding_timestamp(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Ring reports rings as a timestamp sensor that updates after a delay."""
     ring = "sensor.front_door_last_ding"
@@ -195,6 +195,16 @@ async def test_doorbell_from_ring_last_ding_timestamp(
         DOMAIN, "clear_signal", {"entity_id": IMAGE, "signal": "doorbell"}, blocking=True
     )
     assert _signals(hass)["doorbell"] is False
+
+    # A malformed time (e.g. set through the REST API) is not fatal: the change
+    # still counts as activity and the display keeps updating.
+    await _advance(hass, freezer, 1)
+    hass.states.async_set(ring, "2026-13-45T10:00:00", attrs)
+    await hass.async_block_till_done()
+    assert _signals(hass)["doorbell"] is True
+    await _advance(hass, freezer, 61)
+    assert _signals(hass)["doorbell"] is False
+    assert not [r for r in caplog.records if r.levelname == "ERROR"]
 
     # A ring during a restart still shows afterwards, from its timestamp.
     await _advance(hass, freezer, 5)
