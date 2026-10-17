@@ -18,7 +18,7 @@ from .const import (
     CONF_SELECTIONS,
     USER_SCENES_DIR,
 )
-from .language import Scene, SceneError, load_scenes, resolve_binding
+from .language import Scene, SceneError, load_scenes, resolve_binding, selection_fits
 from .runtime import DisplayRuntime
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,7 +43,14 @@ def build_bindings(scene: Scene, options: dict[str, Any]) -> dict[str, dict[str,
     overrides = options.get(CONF_OVERRIDES, {})
     bindings = {}
     for name, signal in scene.signals.items():
-        binding = resolve_binding(signal, selections.get(name), overrides.get(name))
+        selection = selections.get(name)
+        if selection not in (None, "", []) and not selection_fits(signal, selection):
+            _LOGGER.warning(
+                "Ignoring the saved choice for %s (%r), which does not suit scene %s;"
+                " choose it again under Configure",
+                name, selection, scene.id,
+            )
+        binding = resolve_binding(signal, selection, overrides.get(name))
         if binding:
             bindings[name] = binding
     unknown = set(overrides) - set(scene.signals)

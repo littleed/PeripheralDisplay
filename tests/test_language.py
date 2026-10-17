@@ -169,6 +169,13 @@ def test_resolve_binding() -> None:
     with pytest.raises(SceneError):
         resolve_binding(bins, [{"name": "Recycling", "calendar": "sensor.bins"}])
 
+    # Saved choices made for another kind of input are ignored, not coerced
+    # (e.g. one entity id into a list of its characters).
+    assert resolve_binding(motion, "binary_sensor.hall") is None
+    assert resolve_binding(scene.signals["alert"], "octopus") is None
+    assert resolve_binding(scene.signals["weather"], ["weather.home"]) is None
+    assert resolve_binding(bins, ["calendar.bins"]) is None
+
 
 def test_load_scenes_skips_unreadable_files(tmp_path: Path) -> None:
     """One bad file in the user's scenes folder must not hide the others."""

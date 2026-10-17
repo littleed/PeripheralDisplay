@@ -523,6 +523,29 @@ SELECTION_KEYS = {
     "calendar": "items",
     "template": "template",
 }
+_ENTITY_ID = vol.All(str, vol.Match(r"^[a-z0-9_]+\.[a-z0-9_]+$"))
+# The shape of the value the config flow's picker produces for each input.
+_SELECTION_SCHEMAS = {
+    "entities": vol.Schema([_ENTITY_ID]),
+    "entity": _ENTITY_ID,
+    "keywords": vol.Schema([str]),
+    "items": vol.Schema([dict]),
+    "template": vol.Schema(str),
+}
+
+
+def selection_fits(signal: Signal, selection: Any) -> bool:
+    """Whether a saved UI selection has the shape this signal's input takes.
+
+    Selections are stored by signal name, so one made for another scene (or
+    before the scene file changed) may be for a different kind of input.
+    """
+    key = SELECTION_KEYS.get(signal.bind["source"])
+    try:
+        _SELECTION_SCHEMAS[key](selection)
+    except (KeyError, vol.Invalid):
+        return False
+    return True
 
 
 def resolve_binding(
@@ -535,7 +558,8 @@ def resolve_binding(
     """
     binding = dict(signal.bind)
     key = SELECTION_KEYS.get(binding["source"])
-    if key and selection not in (None, "", []):
+    # A selection that does not fit (see selection_fits) is ignored.
+    if selection not in (None, "", []) and selection_fits(signal, selection):
         binding[key] = selection
     if override:
         same_source = override.get("source", binding["source"]) == binding["source"]

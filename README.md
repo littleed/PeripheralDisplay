@@ -54,8 +54,9 @@ For the alert signal, create a Google Alert delivered to an RSS feed and add
 that feed with the Feed Reader integration; then set the alert keywords (or
 `*` for every item of that feed).
 
-Use **Configure** on the integration to switch scene (bindings for standard
-signals carry over) or to edit full bindings as YAML: longer motion holds,
+Use **Configure** on the integration to switch scene (a choice carries over
+when the new scene has a signal of that name taking the same kind of input) or
+to edit full bindings as YAML: longer motion holds,
 a boiler power sensor for heating, a template for night, and so on.
 
 ## Automations

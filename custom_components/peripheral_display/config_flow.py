@@ -24,7 +24,7 @@ from homeassistant.helpers.selector import (
 
 from . import PeripheralDisplayConfigEntry, async_get_scenes, build_bindings
 from .const import CONF_OVERRIDES, CONF_SCENE, CONF_SELECTIONS, DOMAIN
-from .language import SELECTION_KEYS, Scene, SceneError
+from .language import SELECTION_KEYS, Scene, SceneError, resolve_binding, selection_fits
 
 
 def _scene_selector(scenes: dict[str, Scene]) -> SelectSelector:
@@ -87,6 +87,40 @@ def _signals_schema(
             selector = TemplateSelector()
         fields[vol.Optional(name, description={"suggested_value": suggested})] = selector
     return vol.Schema(fields)
+
+
+def _carry_over(
+    old: Scene | None, new: Scene, selections: dict[str, Any], overrides: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The selections and overrides that still make sense in another scene.
+
+    They are stored by signal name, so a choice moves across only when the
+    new scene's signal takes the same kind of input (and, for entities, from
+    the domains its picker offers); an override only when it is valid there.
+    """
+    kept: dict[str, Any] = {}
+    for name, value in selections.items():
+        signal = new.signals.get(name)
+        before = old.signals.get(name) if old else None
+        if signal is None or before is None or not selection_fits(signal, value):
+            continue
+        key = SELECTION_KEYS[signal.bind["source"]]
+        if key != SELECTION_KEYS.get(before.bind["source"]):
+            continue
+        domains = signal.bind.get("domains")
+        ids = {"entity": [value], "entities": value}.get(key, [])
+        if domains and any(e.split(".", 1)[0] not in domains for e in ids):
+            continue
+        kept[name] = value
+    valid: dict[str, Any] = {}
+    for name, override in overrides.items():
+        if name in new.signals:
+            try:
+                resolve_binding(new.signals[name], None, override)
+            except SceneError:
+                continue
+            valid[name] = override
+    return kept, valid
 
 
 def _signals_help(scene: Scene) -> str:
@@ -206,20 +240,23 @@ class PeripheralDisplayOptionsFlow(OptionsFlow):
     async def async_step_signals(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Bind the scene's signals (selections carry over between scenes)."""
+        """Bind the scene's signals (suitable choices carry over between scenes)."""
         scene = self._scenes[self._scene_id]
         errors: dict[str, str] = {}
         placeholders = {"scene": scene.name, "signals": _signals_help(scene), "error": ""}
-        selections = self.config_entry.options.get(CONF_SELECTIONS, {})
+        current = self.config_entry.options
+        selections, overrides = _carry_over(
+            self._scenes.get(current[CONF_SCENE]),
+            scene,
+            current.get(CONF_SELECTIONS, {}),
+            current.get(CONF_OVERRIDES, {}),
+        )
         if user_input is not None:
             options = {
-                **self.config_entry.options,
+                **current,
                 CONF_SCENE: scene.id,
                 CONF_SELECTIONS: _clean(user_input),
-            }
-            # Overrides for signals the new scene lacks would be invalid.
-            options[CONF_OVERRIDES] = {
-                k: v for k, v in options.get(CONF_OVERRIDES, {}).items() if k in scene.signals
+                CONF_OVERRIDES: overrides,
             }
             try:
                 build_bindings(scene, options)

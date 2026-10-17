@@ -68,7 +68,12 @@ that is not an option becomes the default.
 
 Scenes may declare any signals, but reusing these names (with these types)
 means a household's bindings carry over when they switch scene, and the setup
-form shows friendly labels:
+form shows friendly labels. A choice carries over only when the new scene's
+signal takes the same kind of input (one entity, entities, keywords, calendar
+items or a template) and, for entities, offers their domains; an advanced
+override only when it is valid for the new signal. If a scene file is edited
+so that a saved choice no longer fits, it is ignored with a warning in the log
+until it is chosen again:
 
 | Signal     | Type    | Meaning                                         |
 |------------|---------|-------------------------------------------------|

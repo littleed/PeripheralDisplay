@@ -416,3 +416,73 @@ async def test_advanced_options_rebind_signal(hass: HomeAssistant) -> None:
     hass.states.async_set("input_boolean.bedtime", "off")
     await hass.async_block_till_done()
     assert _signals(hass)["night"] is False
+
+
+LIGHTHOUSE = """
+schema: peripheral-display/scene@1
+id: lighthouse
+name: Lighthouse
+signals:
+  weather:
+    type: enum
+    options: [clear, rain]
+    bind: {source: template, template: "{{ 'rain' }}"}
+  night:
+    type: boolean
+    bind: {source: state, entities: [sun.sun], match: [below_horizon], domains: [sun]}
+  motion:
+    type: boolean
+    bind: {source: state, domains: [binary_sensor]}
+  heating:
+    type: enum
+    options: [cold, warm]
+layers:
+  - {id: sea, svg: "<rect/>"}
+"""
+
+
+async def test_switching_scene_keeps_only_choices_that_fit(
+    hass: HomeAssistant, tmp_path
+) -> None:
+    """Choices are stored by signal name; only those that suit the new scene move."""
+    hass.config.config_dir = str(tmp_path)
+    (tmp_path / "peripheral_display/scenes").mkdir(parents=True)
+    (tmp_path / "peripheral_display/scenes/lighthouse.yaml").write_text(LIGHTHOUSE)
+    entry = await _setup(
+        hass,
+        {
+            "weather": "weather.home",  # an entity; Lighthouse wants a template
+            "night": ["input_boolean.bedtime"],  # Lighthouse only offers sun
+            "motion": ["binary_sensor.garden"],  # same kind of input: kept
+        },
+        {
+            "heating": {"source": "numeric", "entity": "sensor.boiler", "max": 9000},
+            "motion": {"hold": 60},
+        },
+    )
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "scene"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"scene": "lighthouse"}
+    )
+    suggested = {
+        str(k): k.description["suggested_value"] for k in result["data_schema"].schema
+    }
+    assert suggested == {
+        "weather": "{{ 'rain' }}",
+        "night": [],
+        "motion": ["binary_sensor.garden"],
+    }
+
+    # Accepting the form as shown works; the heating override, which cannot
+    # drive Lighthouse's enum, is dropped rather than blocking the switch.
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {k: v for k, v in suggested.items() if v}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"]["overrides"] == {"motion": {"hold": 60}}
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert _signals(hass)["weather"] == "rain"
