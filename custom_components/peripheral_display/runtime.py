@@ -70,7 +70,8 @@ def _momentary(binding: dict[str, Any], entity_id: str, state: State | None) -> 
 
 def _fired_at(entity_id: str, state: State | None) -> datetime | None:
     """The time a timestamp entity says it last fired."""
-    if not _is_timestamp(entity_id, state) or state.state in _INVALID:
+    # The entity may not exist yet, e.g. while Home Assistant is starting.
+    if state is None or not _is_timestamp(entity_id, state) or state.state in _INVALID:
         return None
     when = dt_util.parse_datetime(state.state)
     return dt_util.as_utc(when) if when else None

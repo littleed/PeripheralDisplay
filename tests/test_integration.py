@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -199,6 +200,21 @@ async def test_doorbell_from_ring_last_ding_timestamp(
     await _advance(hass, freezer, 5)
     hass.states.async_set(ring, (dt_util.utcnow() - timedelta(seconds=10)).isoformat(), attrs)
     assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _signals(hass)["doorbell"] is True
+
+
+async def test_doorbell_event_entity_missing_at_startup(hass: HomeAssistant) -> None:
+    """Issue #1: a chosen event entity may not exist yet when HA starts."""
+    entry = await _setup(hass, {"doorbell": ["event.front_door_ding"]})
+    assert entry.state is ConfigEntryState.LOADED
+    assert _signals(hass)["doorbell"] is False
+
+    # Ring loads later; its first state is not a ring, the next one is.
+    hass.states.async_set("event.front_door_ding", "2026-10-14T08:00:00+00:00")
+    await hass.async_block_till_done()
+    assert _signals(hass)["doorbell"] is False
+    hass.states.async_set("event.front_door_ding", dt_util.utcnow().isoformat())
     await hass.async_block_till_done()
     assert _signals(hass)["doorbell"] is True
 
