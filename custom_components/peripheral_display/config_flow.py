@@ -23,8 +23,22 @@ from homeassistant.helpers.selector import (
 )
 
 from . import PeripheralDisplayConfigEntry, async_get_scenes, build_bindings
-from .const import CONF_OVERRIDES, CONF_SCENE, CONF_SELECTIONS, DOMAIN
-from .language import SELECTION_KEYS, Scene, SceneError, resolve_binding, selection_fits
+from .const import (
+    CONF_ASPECT_RATIO,
+    CONF_OVERRIDES,
+    CONF_SCENE,
+    CONF_SELECTIONS,
+    DEFAULT_ASPECT_RATIO,
+    DOMAIN,
+)
+from .language import (
+    SELECTION_KEYS,
+    Scene,
+    SceneError,
+    parse_aspect,
+    resolve_binding,
+    selection_fits,
+)
 
 
 def _scene_selector(scenes: dict[str, Scene]) -> SelectSelector:
@@ -33,6 +47,30 @@ def _scene_selector(scenes: dict[str, Scene]) -> SelectSelector:
             options=[SelectOptionDict(value=s.id, label=s.name) for s in scenes.values()]
         )
     )
+
+
+# Common screen shapes; any W:H (or a resolution such as 1280x800) also works.
+_ASPECT_SELECTOR = SelectSelector(
+    SelectSelectorConfig(
+        options=[
+            SelectOptionDict(value="16:9", label="16:9 (TVs, most monitors)"),
+            SelectOptionDict(value="16:10", label="16:10 (Fire HD 8 and 10, many tablets)"),
+            SelectOptionDict(value="4:3", label="4:3 (iPad)"),
+            SelectOptionDict(value="3:2", label="3:2 (Surface, some photo frames)"),
+            SelectOptionDict(value="21:9", label="21:9 (ultrawide)"),
+            SelectOptionDict(value="1:1", label="1:1 (square)"),
+        ],
+        custom_value=True,
+    )
+)
+
+
+def _aspect_error(user_input: dict[str, Any]) -> dict[str, str]:
+    try:
+        parse_aspect(user_input.get(CONF_ASPECT_RATIO))
+    except SceneError:
+        return {CONF_ASPECT_RATIO: "invalid_aspect_ratio"}
+    return {}
 
 
 # One row per item (e.g. per bin) of a calendar-driven items signal.
@@ -151,19 +189,27 @@ class PeripheralDisplayConfigFlow(ConfigFlow, domain=DOMAIN):
         self._scenes = await async_get_scenes(self.hass)
         if not self._scenes:
             return self.async_abort(reason="no_scenes")
-        if user_input is not None:
+        errors = _aspect_error(user_input) if user_input is not None else {}
+        if user_input is not None and not errors:
             self._data = user_input
             return await self.async_step_signals()
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_NAME, default="Peripheral Display"): str,
-                    vol.Required(
-                        CONF_SCENE, default=next(iter(self._scenes))
-                    ): _scene_selector(self._scenes),
-                }
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(
+                    {
+                        vol.Required(CONF_NAME, default="Peripheral Display"): str,
+                        vol.Required(
+                            CONF_SCENE, default=next(iter(self._scenes))
+                        ): _scene_selector(self._scenes),
+                        vol.Required(
+                            CONF_ASPECT_RATIO, default=DEFAULT_ASPECT_RATIO
+                        ): _ASPECT_SELECTOR,
+                    }
+                ),
+                user_input,
             ),
+            errors=errors,
         )
 
     async def async_step_signals(
@@ -176,6 +222,7 @@ class PeripheralDisplayConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             options = {
                 CONF_SCENE: scene.id,
+                CONF_ASPECT_RATIO: self._data[CONF_ASPECT_RATIO],
                 CONF_SELECTIONS: _clean(user_input),
                 CONF_OVERRIDES: {},
             }
@@ -209,6 +256,7 @@ class PeripheralDisplayOptionsFlow(OptionsFlow):
         """Initialise the flow."""
         self._scenes: dict[str, Scene] = {}
         self._scene_id = ""
+        self._aspect_ratio = DEFAULT_ASPECT_RATIO
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -219,10 +267,12 @@ class PeripheralDisplayOptionsFlow(OptionsFlow):
     async def async_step_scene(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Choose the scene preset."""
+        """Choose the scene preset and the screen's shape."""
         self._scenes = await async_get_scenes(self.hass)
-        if user_input is not None:
+        errors = _aspect_error(user_input) if user_input is not None else {}
+        if user_input is not None and not errors:
             self._scene_id = user_input[CONF_SCENE]
+            self._aspect_ratio = user_input[CONF_ASPECT_RATIO]
             return await self.async_step_signals()
         current = self.config_entry.options[CONF_SCENE]
         return self.async_show_form(
@@ -232,9 +282,16 @@ class PeripheralDisplayOptionsFlow(OptionsFlow):
                     vol.Required(
                         CONF_SCENE,
                         default=current if current in self._scenes else next(iter(self._scenes)),
-                    ): _scene_selector(self._scenes)
+                    ): _scene_selector(self._scenes),
+                    vol.Required(
+                        CONF_ASPECT_RATIO,
+                        default=self.config_entry.options.get(
+                            CONF_ASPECT_RATIO, DEFAULT_ASPECT_RATIO
+                        ),
+                    ): _ASPECT_SELECTOR,
                 }
             ),
+            errors=errors,
         )
 
     async def async_step_signals(
@@ -255,6 +312,7 @@ class PeripheralDisplayOptionsFlow(OptionsFlow):
             options = {
                 **current,
                 CONF_SCENE: scene.id,
+                CONF_ASPECT_RATIO: self._aspect_ratio,
                 CONF_SELECTIONS: _clean(user_input),
                 CONF_OVERRIDES: overrides,
             }

@@ -15,7 +15,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import PeripheralDisplayConfigEntry
+from .const import CONF_ASPECT_RATIO
 from .entity import PeripheralDisplayEntity
+from .language import parse_aspect
 
 
 async def async_setup_entry(
@@ -50,11 +52,13 @@ class PeripheralDisplayImage(PeripheralDisplayEntity, ImageEntity):
         """Initialise the image."""
         PeripheralDisplayEntity.__init__(self, entry, "display")
         ImageEntity.__init__(self, hass)
+        # Validated by the config flow; entries from before it existed have none.
+        self._aspect = parse_aspect(entry.options.get(CONF_ASPECT_RATIO))
         self._attr_extra_state_attributes = {"scene": self.runtime.scene.id}
         self._update()
 
     def _update(self) -> None:
-        self._svg = self.runtime.scene.render(self.runtime.values).encode()
+        self._svg = self.runtime.scene.render(self.runtime.values, self._aspect).encode()
         self._attr_image_last_updated = dt_util.utcnow()
 
     async def async_image(self) -> bytes:

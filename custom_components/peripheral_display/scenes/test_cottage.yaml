@@ -257,7 +257,7 @@ vars:
     - value: 50s
 
 defs: |
-  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+  <linearGradient id="sky" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="900">
     <stop offset="0" stop-color="{{ sky_top }}"/>
     <stop offset="1" stop-color="{{ sky_bottom }}"/>
   </linearGradient>
@@ -327,8 +327,8 @@ style: |
   @keyframes rise-wind { 0% { transform: translate(0, 0) scale(0.5); opacity: 0; } 15% { opacity: 0.9; } 100% { transform: translate(260px, -70px) scale(2.2); opacity: 0; } }
   .gust { fill: none; stroke-dasharray: 22 200; animation: gust 2.4s ease-in infinite; }
   @keyframes gust { 0% { stroke-dashoffset: 22; opacity: 0; } 15% { opacity: 0.85; } 85% { opacity: 0.85; } 100% { stroke-dashoffset: -100; opacity: 0; } }
-  .flit { animation: flit 14s linear infinite; }
-  @keyframes flit { from { transform: translate(-200px, 0); } 50% { transform: translate(900px, 40px); } to { transform: translate(1900px, -20px); } }
+  .flit { animation: flit 20s linear infinite; }
+  @keyframes flit { from { transform: translate(-700px, 0); } 50% { transform: translate(800px, 40px); } to { transform: translate(2300px, -20px); } }
   .wing { transform-box: fill-box; transform-origin: 50% 70%; animation: wing 0.25s ease-in-out infinite alternate; }
   @keyframes wing { to { transform: scaleY(0.3); } }
   @keyframes rise { 0% { transform: translate(0, 0) scale(0.5); opacity: 0; } 15% { opacity: 0.9; } 100% { transform: translate(70px, -200px) scale(2.4); opacity: 0; } }
@@ -353,8 +353,8 @@ style: |
   @keyframes blink { 50% { opacity: 0.15; } }
   .spark { transform-box: fill-box; transform-origin: center; animation: spark 0.25s steps(2) infinite; }
   @keyframes spark { 50% { transform: scale(0.4) rotate(30deg); opacity: 0.5; } }
-  .leaf { transform-box: fill-box; transform-origin: center; animation: blow 5s linear infinite; }
-  @keyframes blow { from { transform: translate(-80px, 0) rotate(0deg); } to { transform: translate(1750px, 160px) rotate(900deg); } }
+  .leaf { transform-box: fill-box; transform-origin: center; animation: blow 8s linear infinite; }
+  @keyframes blow { from { transform: translate(-700px, -40px) rotate(0deg); } to { transform: translate(2300px, 200px) rotate(1400deg); } }
   .fog { animation: drift 24s ease-in-out infinite alternate; }
   .banner-text { font: 700 19px Georgia, 'Times New Roman', serif; fill: #7a2b1f; }
   .tag { font: 700 13px Helvetica, Arial, sans-serif; fill: #1d1d1d; }
@@ -362,7 +362,7 @@ style: |
 
 layers:
   - id: sky
-    svg: <rect width="1600" height="900" fill="url(#sky)"/>
+    svg: <rect x="{{ view.x }}" y="{{ view.y }}" width="{{ view.width }}" height="{{ view.height }}" fill="url(#sky)"/>
 
   - id: stars
     when: {all: [night, {signal: weather, in: [clear, partly, wind]}]}
@@ -382,6 +382,13 @@ layers:
         <circle cx="150" cy="300" r="1.3"/><circle cx="470" cy="330" r="1.1"/>
         <circle cx="990" cy="320" r="1.2"/><circle cx="640" cy="350" r="1"/>
         <circle cx="1270" cy="330" r="1.3" class="twinkle" style="animation-delay:-2.5s"/>
+        <circle cx="120" cy="-60" r="1.5"/><circle cx="380" cy="-150" r="1.2" class="twinkle"/>
+        <circle cx="720" cy="-40" r="1.8"/><circle cx="980" cy="-180" r="1.3"/>
+        <circle cx="1300" cy="-90" r="1.6" class="twinkle" style="animation-delay:-1.2s"/><circle cx="1520" cy="-200" r="1.2"/>
+        <circle cx="-80" cy="140" r="1.6"/><circle cx="-260" cy="60" r="1.2" class="twinkle"/>
+        <circle cx="-380" cy="260" r="1.4"/><circle cx="-160" cy="-120" r="1.3"/>
+        <circle cx="1680" cy="80" r="1.5" class="twinkle" style="animation-delay:-0.8s"/><circle cx="1820" cy="220" r="1.2"/>
+        <circle cx="1950" cy="40" r="1.7"/><circle cx="1760" cy="-110" r="1.3"/>
       </g>
 
   - id: sun
@@ -405,7 +412,7 @@ layers:
 
   - id: sky_flash
     when: {signal: weather, is: storm}
-    svg: <rect width="1600" height="900" fill="#e8ecff" opacity="0.35" class="flash"/>
+    svg: <rect x="{{ view.x }}" y="{{ view.y }}" width="{{ view.width }}" height="{{ view.height }}" fill="#e8ecff" opacity="0.35" class="flash"/>
 
   - id: clouds_light
     when: {signal: weather, in: [partly, wind]}
@@ -429,6 +436,10 @@ layers:
           <use href="#cloud" transform="translate(160 20) scale(2)"/>
           <use href="#cloud" transform="translate(800 0) scale(2.2)"/>
           <use href="#cloud" transform="translate(1340 40) scale(1.7)"/>
+          <use href="#cloud" transform="translate(-560 60) scale(2)"/>
+          <use href="#cloud" transform="translate(1760 100) scale(1.9)"/>
+          <use href="#cloud" transform="translate(300 -200) scale(2.1)"/>
+          <use href="#cloud" transform="translate(1000 -230) scale(2)"/>
         </g>
       </g>
 
@@ -457,21 +468,21 @@ layers:
       </g></g>
 
   - id: far_hills
-    svg: <path d="M0,540 C180,470 360,500 520,520 C700,545 860,470 1040,480 C1220,490 1400,530 1600,500 L1600,720 L0,720 Z" fill="{{ far_hill }}"/>
+    svg: <path d="M{{ view.x }},560 C-120,560 -60,540 0,540 C180,470 360,500 520,520 C700,545 860,470 1040,480 C1220,490 1400,530 1600,500 C1700,485 1800,470 {{ view.right }},480 L{{ view.right }},720 L{{ view.x }},720 Z" fill="{{ far_hill }}"/>
 
   - id: mid_hills
-    svg: <path d="M0,620 C200,560 420,590 600,600 C820,612 1000,560 1200,575 C1380,588 1500,600 1600,590 L1600,730 L0,730 Z" fill="{{ mid_hill }}"/>
+    svg: <path d="M{{ view.x }},585 C-150,585 -80,640 0,620 C200,560 420,590 600,600 C820,612 1000,560 1200,575 C1380,588 1500,600 1600,590 C1700,580 1800,600 {{ view.right }},600 L{{ view.right }},730 L{{ view.x }},730 Z" fill="{{ mid_hill }}"/>
 
   - id: fog_far
     when: {signal: weather, is: fog}
     svg: |
-      <rect width="1600" height="900" fill="#eef1f4" opacity="0.35"/>
-      <g fill="#f4f6f8" opacity="0.6" class="fog"><ellipse cx="420" cy="555" rx="520" ry="38"/><ellipse cx="1250" cy="590" rx="600" ry="42"/></g>
+      <rect x="{{ view.x }}" y="{{ view.y }}" width="{{ view.width }}" height="{{ view.height }}" fill="#eef1f4" opacity="0.35"/>
+      <g fill="#f4f6f8" opacity="0.6" class="fog"><ellipse cx="200" cy="555" rx="900" ry="40"/><ellipse cx="1350" cy="590" rx="1000" ry="44"/></g>
 
   - id: ground
     svg: |
-      <path d="M0,700 C300,680 600,690 800,700 C1000,710 1300,688 1600,700 L1600,900 L0,900 Z" fill="{{ ground }}"/>
-      <polygon points="778,702 812,702 900,900 690,900" fill="{{ path_color }}"/>
+      <path d="M{{ view.x }},700 L0,700 C300,680 600,690 800,700 C1000,710 1300,688 1600,700 L{{ view.right }},700 L{{ view.right }},{{ view.bottom }} L{{ view.x }},{{ view.bottom }} Z" fill="{{ ground }}"/>
+      <polygon points="778,702 812,702 1567,2400 23,2400" fill="{{ path_color }}"/>
 
   - id: trees
     svg: |
@@ -710,8 +721,8 @@ layers:
 
   - id: fence
     svg: |
-      <g fill="{{ fence }}"><rect x="1100" y="746" width="500" height="7"/><rect x="1100" y="773" width="500" height="7"/></g>
-      <rect x="1100" y="726" width="500" height="70" fill="url(#pickets)"/>
+      <g fill="{{ fence }}"><rect x="1100" y="746" width="3000" height="7"/><rect x="1100" y="773" width="3000" height="7"/></g>
+      <rect x="1100" y="726" width="3000" height="70" fill="url(#pickets)"/>
 
   - id: pole
     svg: |
@@ -757,21 +768,21 @@ layers:
 
   - id: fog_near
     when: {signal: weather, is: fog}
-    svg: <g fill="#f4f6f8" opacity="0.5" class="fog" style="animation-delay:-9s"><ellipse cx="760" cy="735" rx="760" ry="55"/></g>
+    svg: <g fill="#f4f6f8" opacity="0.5" class="fog" style="animation-delay:-9s"><ellipse cx="800" cy="735" rx="1600" ry="60"/></g>
 
   - id: rain
     when: {signal: weather, in: [rain, storm]}
-    svg: <g class="fall"><rect y="-120" width="1600" height="1140" fill="url(#rain)"/></g>
+    svg: <g class="fall"><rect x="-1500" y="-1500" width="4600" height="4000" fill="url(#rain)"/></g>
 
   - id: rain_heavy
     when: {signal: weather, is: storm}
-    svg: <g class="fall-fast"><rect x="-60" y="-160" width="1720" height="1180" fill="url(#rain)" transform="translate(60 40)"/></g>
+    svg: <g class="fall-fast"><rect x="-1500" y="-1500" width="4600" height="4000" fill="url(#rain)" transform="translate(60 40)"/></g>
 
   - id: snow
     when: {signal: weather, is: snow}
     svg: |
-      <g class="fall-slow"><rect y="-120" width="1600" height="1140" fill="url(#snow)"/></g>
-      <g class="fall-mid" opacity="0.8"><rect y="-120" width="1600" height="1140" fill="url(#snow)" transform="translate(50 30)"/></g>
+      <g class="fall-slow"><rect x="-1500" y="-1500" width="4600" height="4000" fill="url(#snow)"/></g>
+      <g class="fall-mid" opacity="0.8"><rect x="-1500" y="-1500" width="4600" height="4000" fill="url(#snow)" transform="translate(50 30)"/></g>
 
   - id: lightning
     when: {signal: weather, is: storm}
@@ -802,4 +813,4 @@ layers:
       </g>
 
   - id: vignette
-    svg: <rect width="1600" height="900" fill="url(#vignette)"/>
+    svg: <rect x="{{ view.x }}" y="{{ view.y }}" width="{{ view.width }}" height="{{ view.height }}" fill="url(#vignette)"/>

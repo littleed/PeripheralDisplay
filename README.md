@@ -35,26 +35,31 @@ entities, feeds, templates or automations.
    integration repository).
 2. Restart Home Assistant.
 3. **Settings → Devices & services → Add integration → Peripheral Display**.
-   Name it, pick a scene, and choose what drives each signal. Every field is
-   optional.
+   Name it, pick a scene and your screen's aspect ratio (16:10 for a Fire HD
+   8 or 10, 4:3 for an iPad, or any `W:H` or resolution such as `1280x800`),
+   and choose what drives each signal. Every field is optional. The scene
+   always shows whole and extends its sky and ground to fill the screen.
 4. Add a **Picture Entity** card for `image.<name>`. For a wall display, put
-   it alone in a *Panel* view; set the aspect ratio so the panel does not crop
-   the sides:
+   it alone in a *Panel* view, with the same aspect ratio as the display:
 
    ```yaml
    type: picture-entity
    entity: image.living_room_art
    show_name: false
    show_state: false
-   aspect_ratio: "16:9"
-   fit_mode: contain
+   aspect_ratio: "16:10"
+   fit_mode: cover
    ```
+
+   Use the ratio of the area the card fills: the whole screen in a kiosk or
+   full-screen browser, or less the header and status bar otherwise.
 
 For the alert signal, create a Google Alert delivered to an RSS feed and add
 that feed with the Feed Reader integration; then set the alert keywords (or
 `*` for every item of that feed).
 
-Use **Configure** on the integration to switch scene (a choice carries over
+Use **Configure** on the integration to change the screen aspect ratio,
+switch scene (a choice carries over
 when the new scene has a signal of that name taking the same kind of input) or
 to edit full bindings as YAML: longer motion holds,
 a boiler power sensor for heating, a template for night, and so on.

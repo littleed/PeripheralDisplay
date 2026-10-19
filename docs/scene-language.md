@@ -24,7 +24,7 @@ id: my_scene                         # lower_snake_case, unique
 name: My scene                       # shown in the scene picker
 description: ...                     # optional
 author: ...                          # optional
-canvas: {width: 1600, height: 900}   # optional, these are the defaults
+canvas: {width: 1600, height: 900}   # optional, these are the defaults (see Rendering)
 signals: {...}                       # required, at least one
 vars: {...}                          # optional
 defs: |                              # optional SVG <defs> content
@@ -271,6 +271,15 @@ Inside a `repeat` layer, `{{ item.name }}`, `{{ item.color }}`,
 `{{ item.day }}`, `{{ item.date }}` and `{{ index }}` (0, 1, ...) are also
 available. Filters can be chained, e.g. `{{ item.name|upper|truncate:12 }}`.
 
+`{{ view.x }}`, `{{ view.y }}`, `{{ view.width }}`, `{{ view.height }}`,
+`{{ view.right }}` and `{{ view.bottom }}` give the visible area in canvas
+units (see Rendering), so a backdrop can reach every edge of any screen:
+
+```yaml
+- id: sky
+  svg: <rect x="{{ view.x }}" y="{{ view.y }}" width="{{ view.width }}" height="{{ view.height }}" fill="url(#sky)"/>
+```
+
 | Filter          | Effect                                  |
 |-----------------|-----------------------------------------|
 | `upper`         | upper case                              |
@@ -324,6 +333,14 @@ Authoring tips:
 
 The display is an `image` entity (`image/svg+xml`) that re-renders when any
 signal changes. Show it with a Picture Entity or Picture card; a panel-view
-dashboard with only that card makes a full-screen wall display. The companion
+dashboard with only that card makes a full-screen wall display.
+
+Each display has a screen aspect ratio (e.g. `16:10`). The `canvas` is the
+safe area: it is always shown whole, centred and unstretched, and the picture
+is widened (wider screens) or heightened (taller screens) around it to match
+the screen. Draw the essentials inside the canvas and let backdrops, ground and
+weather run past its edges, using `view.*` placeholders or generous sizes;
+anything outside the visible area is simply not shown. Gradients that should
+not stretch with the view can use `gradientUnits="userSpaceOnUse"`. The companion
 `sensor.*_active_signals` lists active signals and exposes every value as an
 attribute, for debugging and automations.

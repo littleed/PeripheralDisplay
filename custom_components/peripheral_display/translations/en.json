@@ -4,7 +4,8 @@
       "no_scenes": "No valid scene presets were found. Check the log for scene validation errors."
     },
     "error": {
-      "invalid_binding": "Invalid binding: {error}"
+      "invalid_binding": "Invalid binding: {error}",
+      "invalid_aspect_ratio": "Use a ratio such as 16:10, a resolution such as 1280x800, or a number such as 1.6 (between 1:4 and 4:1)."
     },
     "step": {
       "user": {
@@ -12,7 +13,11 @@
         "description": "A Peripheral Display is an artwork whose details change with your home's state. Choose a scene preset; you can add your own in the `peripheral_display/scenes` folder of your configuration directory.",
         "data": {
           "name": "Name",
-          "scene": "Scene preset"
+          "scene": "Scene preset",
+          "aspect_ratio": "Screen aspect ratio"
+        },
+        "data_description": {
+          "aspect_ratio": "The shape of the area the picture fills. The whole scene is always shown; on a wider or taller screen the sky, ground and weather extend to fill it. Then set the dashboard card to the same aspect ratio."
         }
       },
       "signals": {
@@ -51,19 +56,24 @@
   },
   "options": {
     "error": {
-      "invalid_binding": "Invalid binding: {error}"
+      "invalid_binding": "Invalid binding: {error}",
+      "invalid_aspect_ratio": "Use a ratio such as 16:10, a resolution such as 1280x800, or a number such as 1.6 (between 1:4 and 4:1)."
     },
     "step": {
       "init": {
         "menu_options": {
-          "scene": "Change scene and entities",
+          "scene": "Change scene, screen shape and entities",
           "advanced": "Advanced bindings (YAML)"
         }
       },
       "scene": {
-        "title": "Scene preset",
+        "title": "Scene preset and screen",
         "data": {
-          "scene": "Scene preset"
+          "scene": "Scene preset",
+          "aspect_ratio": "Screen aspect ratio"
+        },
+        "data_description": {
+          "aspect_ratio": "The shape of the area the picture fills. The whole scene is always shown; on a wider or taller screen the sky, ground and weather extend to fill it. Then set the dashboard card to the same aspect ratio."
         }
       },
       "signals": {

@@ -31,12 +31,15 @@ SOURCES = ("state", "numeric", "map", "event", "calendar", "template", "manual")
 FILTERS = ("upper", "lower", "truncate")
 # Fields of each item of an items signal, as {{ item.<field> }} in repeat layers.
 ITEM_FIELDS = ("name", "color", "day", "date")
+# The visible area, as {{ view.<field> }}: the canvas widened or heightened
+# to the screen's aspect ratio. Layers that should reach every edge use it.
+VIEW_FIELDS = ("x", "y", "width", "height", "right", "bottom")
 DEFAULT_ITEM_COLOR = "#3b4047"
 
 _NAME = r"[a-z][a-z0-9_]*"
 _NAME_RE = re.compile(rf"^{_NAME}$")
 _PLACEHOLDER_RE = re.compile(
-    rf"\{{\{{\s*((?:item\.)?{_NAME})\s*((?:\|\s*[a-z]+(?::\d+)?\s*)*)\}}\}}"
+    rf"\{{\{{\s*((?:item\.|view\.)?{_NAME})\s*((?:\|\s*[a-z]+(?::\d+)?\s*)*)\}}\}}"
 )
 _FILTER_RE = re.compile(r"\|\s*([a-z]+)(?::(\d+))?")
 _TRUE_STRINGS = {"on", "true", "yes", "1", "home", "open", "detected", "playing"}
@@ -292,13 +295,34 @@ class Scene:
 
         return [text(sig) for sig in self.signals.values() if sig.truthy(values[sig.name])]
 
-    def render(self, values: dict[str, Any]) -> str:
-        """Render the scene to an SVG document."""
+    def view_box(self, aspect: float | None = None) -> tuple[float, float, float, float]:
+        """The visible area for a screen aspect ratio: x, y, width, height.
+
+        The canvas is always shown whole and centred; a wider screen shows
+        more to its sides, a taller one more above and below.
+        """
+        x, y, width, height = 0.0, 0.0, float(self.width), float(self.height)
+        if aspect and aspect > width / height:
+            width = round(height * aspect, 2)
+            x = round((self.width - width) / 2, 2)
+        elif aspect:
+            height = round(width / aspect, 2)
+            y = round((self.height - height) / 2, 2)
+        return x, y, width, height
+
+    def render(self, values: dict[str, Any], aspect: float | None = None) -> str:
+        """Render the scene to an SVG document for a screen aspect ratio."""
         values = {
             name: sig.coerce(values[name]) if name in values else sig.default
             for name, sig in self.signals.items()
         }
-        context = {**values, **self.resolve_vars(values)}
+        x, y, width, height = self.view_box(aspect)
+        view = dict(zip(VIEW_FIELDS, (x, y, width, height, x + width, y + height), strict=True))
+        context = {
+            **values,
+            **self.resolve_vars(values),
+            **{f"view.{k}": f"{v:g}" for k, v in view.items()},
+        }
 
         def fill(text: str, extra: dict[str, Any] | None = None) -> str:
             scope = {**context, **extra} if extra else context
@@ -342,8 +366,9 @@ class Scene:
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" '
             f'xmlns:xlink="http://www.w3.org/1999/xlink" '
-            f'viewBox="0 0 {self.width} {self.height}" '
-            f'width="{self.width}" height="{self.height}" role="img">\n'
+            f'viewBox="{x:g} {y:g} {width:g} {height:g}" '
+            f'width="{width:g}" height="{height:g}" '
+            f'preserveAspectRatio="xMidYMid slice" role="img">\n'
             f"<title>{title}</title>\n"
             f"<style><![CDATA[{fill(self.style)}]]></style>\n"
             f"<defs>{fill(self.defs)}</defs>\n"
@@ -478,7 +503,7 @@ def parse_scene(data: Any) -> Scene:
             )
         )
 
-    known = set(signals) | set(doc["vars"])
+    known = set(signals) | set(doc["vars"]) | {f"view.{f}" for f in VIEW_FIELDS}
     in_repeat = {"index"} | {f"item.{f}" for f in ITEM_FIELDS}
     for where, text, repeated in [("defs", doc["defs"], False), ("style", doc["style"], False)] + [
         (f"layer '{layer.id}'", layer.svg, bool(layer.repeat)) for layer in layers
@@ -586,6 +611,19 @@ def resolve_binding(
     if not required or not all(binding.get(k) for k in required):
         return None
     return binding
+
+
+def parse_aspect(text: Any) -> float | None:
+    """A screen aspect ratio from ``16:10``, ``1280x800`` or ``1.6``; empty is None."""
+    if text in (None, ""):
+        return None
+    match = re.fullmatch(
+        r"\s*(\d+(?:\.\d+)?)\s*(?:[:x×/]\s*(\d+(?:\.\d+)?))?\s*", str(text)
+    )
+    width, height = (float(match[1]), float(match[2] or 1)) if match else (0, 0)
+    if not height or not 0.25 <= width / height <= 4:
+        raise SceneError(f"'{text}' is not an aspect ratio such as 16:10 or 1280x800")
+    return width / height
 
 
 def load_scene_file(path: Path) -> Scene:

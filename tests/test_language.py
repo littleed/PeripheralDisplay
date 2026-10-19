@@ -11,6 +11,7 @@ from custom_components.peripheral_display.language import (
     SceneError,
     load_scene_file,
     load_scenes,
+    parse_aspect,
     parse_scene,
     resolve_binding,
 )
@@ -185,3 +186,41 @@ def test_load_scenes_skips_unreadable_files(tmp_path: Path) -> None:
     scenes, errors = load_scenes(tmp_path)
     assert list(scenes) == ["test_cottage"]
     assert [e.split(":")[0] for e in errors] == ["a_binary.yaml", "b_empty.yaml"]
+
+
+@pytest.mark.parametrize(
+    ("aspect", "view_box"),
+    [
+        (None, (0, 0, 1600, 900)),
+        ("16:9", (0, 0, 1600, 900)),
+        # Taller screens show more above and below; wider ones more to the sides.
+        ("16:10", (0, -50, 1600, 1000)),
+        ("1280x800", (0, -50, 1600, 1000)),
+        ("4:3", (0, -150, 1600, 1200)),
+        ("21:9", (-250, 0, 2100, 900)),
+        ("2", (-100, 0, 1800, 900)),
+    ],
+)
+def test_view_box_fits_the_screen_around_the_canvas(aspect, view_box) -> None:
+    assert load_scene_file(TEST_SCENE).view_box(parse_aspect(aspect)) == view_box
+
+
+@pytest.mark.parametrize("text", ["4 by 3", "16:0", "0:9", "5:1", "wide"])
+def test_parse_aspect_rejects_nonsense(text: str) -> None:
+    with pytest.raises(SceneError):
+        parse_aspect(text)
+
+
+def test_view_placeholders_reach_every_edge() -> None:
+    doc = deepcopy(BASE)
+    doc["layers"].append(
+        {
+            "id": "backdrop",
+            "svg": '<rect x="{{ view.x }}" y="{{ view.y }}" width="{{ view.width }}"'
+            ' height="{{ view.height }}"/><path d="M0,0 L{{ view.right }},{{ view.bottom }}"/>',
+        }
+    )
+    svg = parse_scene(doc).render({}, parse_aspect("4:3"))
+    assert 'viewBox="0 -150 1600 1200"' in svg and 'width="1600" height="1200"' in svg
+    assert '<rect x="0" y="-150" width="1600" height="1200"/>' in svg
+    assert '<path d="M0,0 L1600,1050"/>' in svg

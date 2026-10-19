@@ -59,7 +59,13 @@ async def test_config_flow_creates_display(hass: HomeAssistant) -> None:
     )
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"name": "Living room art", "scene": "test_cottage"}
+        result["flow_id"],
+        {"name": "Living room art", "scene": "test_cottage", "aspect_ratio": "4 by 3"},
+    )
+    assert result["errors"] == {"aspect_ratio": "invalid_aspect_ratio"}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"name": "Living room art", "scene": "test_cottage", "aspect_ratio": "16:10"},
     )
     assert result["step_id"] == "signals"
     # The scene asks for one input per bound signal; night is pre-filled.
@@ -84,6 +90,7 @@ async def test_config_flow_creates_display(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["options"] == {
         "scene": "test_cottage",
+        "aspect_ratio": "16:10",
         "selections": {
             "night": ["sun.sun"],
             "motion": ["binary_sensor.garden"],
@@ -94,7 +101,9 @@ async def test_config_flow_creates_display(hass: HomeAssistant) -> None:
     }
     await hass.async_block_till_done()
     assert _signals(hass)["night"] is True
-    assert hass.states.get(IMAGE) is not None
+    # The picture is drawn for the chosen screen shape.
+    image = hass.data["image"].get_entity(IMAGE)
+    assert 'viewBox="0 -50 1600 1000"' in (await image.async_image()).decode()
 
 
 async def test_signals_follow_home_state(hass: HomeAssistant, hass_client) -> None:
