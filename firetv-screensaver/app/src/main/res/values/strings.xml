@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Peripheral Display</string>
+    <string name="intro">Shows a Peripheral Display image entity as the Fire TV screensaver.</string>
+    <string name="url_hint">Home Assistant address, e.g. http://192.168.1.10:8123</string>
+    <string name="entity_hint">Image entity, e.g. image.tv_art</string>
+    <string name="token_hint">Long-lived access token</string>
+    <string name="save">Save</string>
+    <string name="preview">Preview</string>
+    <string name="saved">Saved</string>
+    <string name="not_set_up">Open Peripheral Display from your apps to set up the screensaver.</string>
+</resources>

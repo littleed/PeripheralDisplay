@@ -85,6 +85,12 @@ integration. Start from
 [`scenes/test_cottage.yaml`](custom_components/peripheral_display/scenes/test_cottage.yaml);
 the language reference is in [docs/scene-language.md](docs/scene-language.md).
 
+## Fire TV screensaver
+
+[`firetv-screensaver/`](firetv-screensaver/README.md) is a separate Android
+TV app that shows a display's `image` entity as the Fire TV screensaver
+(Fire OS 7 and older). HACS installs only the integration, not the app.
+
 ## Development
 
 ```sh
