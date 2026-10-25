@@ -29,6 +29,20 @@ entities, feeds, templates or automations.
 | alert      | a pigeon flies in with the matching headline                | keywords for Feed Reader items     |
 | season     | Halloween: pumpkins, bats, cobweb, full moon. Christmas: roof lights, wreath, decorated tree, a snowman when it snows | automatic: December, and 24 Oct – 7 Nov (editable) |
 
+## The Stranger at the Door: a golden-age film poster
+
+A painted 1946 Hollywood half-sheet for a film-noir thriller, with billing,
+tagline and National Screen Service fine print on aged, folded paper.
+
+| Signal     | In the picture                                              | Bind it to                         |
+|------------|-------------------------------------------------------------|------------------------------------|
+| weather    | the poster's colour, a weather emblem around the title (sunburst, painted clouds, a lightning bolt, snowflakes, wind swirls), a tagline to match, and rain, snow or fog over the picture | a `weather` entity |
+| night      | a night-blue poster with a crescent moon and stars          | `sun.sun` (pre-filled)             |
+| doorbell   | the red front door swings open on a shadowy man in a fedora | doorbell sensors, `event`s, or Ring's *Last ding* |
+| side door  | the green side door swings open on a woman in a wide hat    | door, motion or doorbell sensors at the side door |
+| heating    | smoke from the steam train, heavier with more heating       | `climate` entities                 |
+| cinema     | a studio camera on the lawn, its reels turning              | `media_player`s                    |
+
 ## Install
 
 1. Copy `custom_components/peripheral_display` into your Home Assistant

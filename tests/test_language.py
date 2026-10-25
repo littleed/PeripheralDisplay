@@ -44,31 +44,27 @@ def _layers(svg: str) -> set[str]:
     return {g.get("id") for g in root if g.get("id", "").startswith("layer-")}
 
 
-def test_test_scene_renders_valid_svg_for_every_combination() -> None:
-    """Every layer of the shipped scene produces well-formed SVG together."""
-    scene = load_scene_file(TEST_SCENE)
-    weathers = scene.signals["weather"].options
+@pytest.mark.parametrize(
+    "path", sorted(TEST_SCENE.parent.glob("*.yaml")), ids=lambda path: path.stem
+)
+def test_shipped_scenes_render_valid_svg_for_every_combination(path: Path) -> None:
+    """Every layer of each shipped scene produces well-formed SVG together."""
+    scene = load_scene_file(path)
     bins = [{"name": "Glass & <plastics>", "color": "#3e8e3a", "day": "FRI", "date": "2026-10-16"}] * 3
+    active = {"boolean": True, "level": 1.0, "text": "Fish & chips <tonight>", "items": bins}
+    idle = {"boolean": False, "level": 0.0, "text": "", "items": []}
+    enums = [sig for sig in scene.signals.values() if sig.type == "enum"]
     seen: set[str] = set()
-    seasons = scene.signals["season"].options
-    for weather, night, season, on in itertools.product(
-        weathers, (False, True), seasons, (False, True)
+    for options, night, on in itertools.product(
+        itertools.product(*(sig.options for sig in enums)), (False, True), (False, True)
     ):
         values = {
-            "weather": weather,
-            "night": night,
-            "season": season,
-            "side_door": on,
-            "bins": bins if on else [],
-            "motion": on,
-            "doorbell": on,
-            "lights": 1.0 if on else 0.0,
-            "heating": 1.0 if on else 0.0,
-            "wind": 1.0 if on else 0.0,
-            "cinema": on,
-            "offline": on,
-            "alert": "Fish & chips <tonight>" if on else "",
+            sig.name: (active if on else idle)[sig.type]
+            for sig in scene.signals.values()
+            if sig.type != "enum"
         }
+        values |= {sig.name: option for sig, option in zip(enums, options, strict=True)}
+        values["night"] = night
         seen |= _layers(scene.render(values))
     # Every layer is reachable by some combination of the signals.
     assert seen == {f"layer-{layer.id}" for layer in scene.layers}
