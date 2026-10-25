@@ -64,6 +64,7 @@ def test_test_scene_renders_valid_svg_for_every_combination() -> None:
             "doorbell": on,
             "lights": 1.0 if on else 0.0,
             "heating": 1.0 if on else 0.0,
+            "wind": 1.0 if on else 0.0,
             "cinema": on,
             "offline": on,
             "alert": "Fish & chips <tonight>" if on else "",

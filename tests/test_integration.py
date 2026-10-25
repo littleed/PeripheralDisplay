@@ -71,7 +71,7 @@ async def test_config_flow_creates_display(hass: HomeAssistant) -> None:
     # The scene asks for one input per bound signal; night is pre-filled.
     fields = {str(k): k for k in result["data_schema"].schema}
     assert set(fields) == {
-        "weather", "night", "motion", "doorbell", "side_door", "lights",
+        "weather", "wind", "night", "motion", "doorbell", "side_door", "lights",
         "heating", "cinema", "bins", "offline", "season", "alert",
     }
     assert fields["night"].description == {"suggested_value": ["sun.sun"]}
@@ -152,6 +152,29 @@ async def test_signals_follow_home_state(hass: HomeAssistant, hass_client) -> No
         assert layer in svg
     assert "layer-light_right" in svg  # 0.5 > 0.34
     assert "layer-light_gable" not in svg
+
+
+async def test_wind_speed_blows_over_any_weather(hass: HomeAssistant) -> None:
+    """met.no never reports "windy"; its wind speed brings the wind instead."""
+    # 20 mph is 32 km/h: above the scene's 30 km/h, though 20 is not.
+    hass.states.async_set(
+        "weather.forecast_home", "rainy", {"wind_speed": 20, "wind_speed_unit": "mph"}
+    )
+    await _setup(hass, {"weather": "weather.forecast_home", "wind": "weather.forecast_home"})
+    image = hass.data["image"].get_entity(IMAGE)
+    assert _signals(hass)["wind"] == pytest.approx((32.18688 - 30) / 30)
+    svg = (await image.async_image()).decode()
+    for layer in ("layer-rain", "layer-gusts", "layer-leaves"):
+        assert layer in svg
+
+    hass.states.async_set(
+        "weather.forecast_home", "sunny", {"wind_speed": 15, "wind_speed_unit": "mph"}
+    )
+    await hass.async_block_till_done()
+    assert _signals(hass)["wind"] == 0
+    svg = (await image.async_image()).decode()
+    assert "layer-sun" in svg
+    assert "layer-gusts" not in svg
 
 
 async def test_motion_holds_after_clearing(

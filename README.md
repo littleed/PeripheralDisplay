@@ -15,7 +15,8 @@ entities, feeds, templates or automations.
 
 | Signal     | In the picture                                              | Bind it to                         |
 |------------|-------------------------------------------------------------|------------------------------------|
-| weather    | sky colour, sun, clouds, rain, lightning, snow, fog; wind bends the trees, blows leaves and smoke, and sends gusts across the sky | a `weather` entity |
+| weather    | sky colour, sun, clouds, rain, lightning, snow, fog         | a `weather` entity                 |
+| wind       | above 30 km/h, on top of any weather: the trees bend, leaves and smoke blow, gusts cross the sky (a windy or stormy condition does this too) | a `weather` entity, for its wind speed |
 | night      | night palette, moon and stars, glowing windows              | `sun.sun` (pre-filled)             |
 | motion     | a fox trots through the garden; the security lamp floods    | motion sensors, or Ring's *Last motion* |
 | doorbell   | a visitor at the door, porch lamp lit and ringing           | doorbell sensors, `event`s, or Ring's *Last ding* |

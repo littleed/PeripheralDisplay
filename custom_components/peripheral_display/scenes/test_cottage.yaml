@@ -1,6 +1,8 @@
 # A test scene that exercises every standard signal.
 #
-#   weather  -> sky colour, sun, clouds, rain, lightning, snow, fog, wind
+#   weather  -> sky colour, sun, clouds, rain, lightning, snow, fog
+#   wind     -> above 30 km/h, on top of any weather: trees bend, leaves blow,
+#               smoke streams sideways and gusts cross the sky
 #   night    -> night palette, moon and stars, glowing windows
 #   motion   -> a fox trots through the garden; the security lamp floods at night
 #   doorbell -> a visitor at the door, the porch lamp lit and ringing
@@ -14,8 +16,8 @@
 #   season   -> Halloween (pumpkins, bats, a full moon) and Christmas (roof
 #               lights, wreath, decorated tree, a snowman in the snow)
 #
-# Wind and storms bend the trees, blow leaves, push the smoke sideways and
-# send gusts across the sky.
+# A windy or stormy weather condition also brings the wind, for weather
+# services that report wind that way.
 schema: peripheral-display/scene@1
 id: test_cottage
 name: Cottage in the Valley (test scene)
@@ -41,6 +43,17 @@ signals:
         snow: [snowy, snowy-rainy, hail]
         fog: [fog]
         wind: [windy, windy-variant]
+  wind:
+    type: level
+    label: Wind
+    description: Trees bend, leaves blow and gusts cross the sky when the wind is above 30 km/h, whatever the weather.
+    bind:
+      source: numeric
+      domains: [weather]
+      attribute: wind_speed
+      unit: km/h
+      min: 30
+      max: 60
   night:
     type: boolean
     label: Night
@@ -241,7 +254,7 @@ vars:
     - {when: night, value: 0.55}
     - value: 0.22
   sway:
-    - {when: {signal: weather, in: [wind, storm]}, value: sway}
+    - {when: {any: [wind, {signal: weather, in: [wind, storm]}]}, value: sway}
     - value: still
   web:
     - {when: night, value: "#e9e9f0"}
@@ -250,10 +263,10 @@ vars:
     - {when: night, value: "#c9a3e6"}
     - value: none
   puff:
-    - {when: {signal: weather, in: [wind, storm]}, value: puff-wind}
+    - {when: {any: [wind, {signal: weather, in: [wind, storm]}]}, value: puff-wind}
     - value: puff
   cloud_speed:
-    - {when: {signal: weather, in: [wind, storm]}, value: 9s}
+    - {when: {any: [wind, {signal: weather, in: [wind, storm]}]}, value: 9s}
     - value: 50s
 
 defs: |
@@ -789,7 +802,7 @@ layers:
     svg: <polygon points="430,180 395,305 422,305 382,440 456,282 428,282 458,180" fill="#fffbd0" class="flash"/>
 
   - id: gusts
-    when: {signal: weather, in: [wind, storm]}
+    when: {any: [wind, {signal: weather, in: [wind, storm]}]}
     svg: |
       <g stroke="#ffffff" stroke-width="3" stroke-linecap="round">
         <path class="gust" pathLength="100" d="M-40,250 C200,220 330,290 520,250 S820,200 980,250 C1080,280 1100,230 1060,215 C1030,205 1010,235 1040,245"/>
@@ -799,7 +812,7 @@ layers:
       </g>
 
   - id: leaves
-    when: {signal: weather, in: [wind, storm]}
+    when: {any: [wind, {signal: weather, in: [wind, storm]}]}
     svg: |
       <g fill="#c9822f">
         <ellipse cx="0" cy="450" rx="11" ry="5" class="leaf" style="animation-delay:-0.7s" fill="#d9a441"/>

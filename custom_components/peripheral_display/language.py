@@ -92,6 +92,7 @@ BINDING_SCHEMA = vol.Schema(
         vol.Optional("invert"): bool,
         vol.Optional("min"): vol.Coerce(float),
         vol.Optional("max"): vol.Coerce(float),
+        vol.Optional("unit"): str,
         vol.Optional("map"): {str: vol.All(vol.Coerce(list), [vol.Coerce(str)])},
         vol.Optional("compare"): vol.In(("exact", "contains")),
         vol.Optional("days"): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),

@@ -7,7 +7,11 @@ from datetime import date, datetime, timedelta
 import logging
 from typing import Any
 
-from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.const import (
+    ATTR_UNIT_OF_MEASUREMENT,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+)
 from homeassistant.core import (
     CALLBACK_TYPE,
     Event,
@@ -26,7 +30,7 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 from homeassistant.helpers.template import Template
-from homeassistant.util import dt as dt_util
+from homeassistant.util import dt as dt_util, unit_conversion
 
 from .language import Scene, Signal
 
@@ -36,6 +40,14 @@ DEFAULT_MOMENTARY_HOLD = 30.0
 DEFAULT_CALENDAR_DAYS = 7
 CALENDAR_REFRESH = timedelta(minutes=15)
 _WEEKDAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+# Home Assistant's unit converters (speed, temperature, ...) for ``unit``.
+_CONVERTERS = [
+    c
+    for c in vars(unit_conversion).values()
+    if isinstance(c, type)
+    and issubclass(c, unit_conversion.BaseUnitConverter)
+    and c is not unit_conversion.BaseUnitConverter
+]
 
 
 def _read(binding: dict[str, Any], state: State | None) -> Any:
@@ -45,6 +57,26 @@ def _read(binding: dict[str, Any], state: State | None) -> Any:
     if attribute := binding.get("attribute"):
         return state.attributes.get(attribute)
     return state.state
+
+
+def _convert(binding: dict[str, Any], state: State, number: float) -> float | None:
+    """A reading in the binding's ``unit``, from the unit the entity reports.
+
+    Weather entities report each attribute's unit as ``<attribute>_unit``
+    (e.g. ``wind_speed_unit``); sensors as ``unit_of_measurement``. A reading
+    without a unit is taken to be in the binding's unit already.
+    """
+    attribute = binding.get("attribute")
+    reported = state.attributes.get(
+        f"{attribute}_unit" if attribute else ATTR_UNIT_OF_MEASUREMENT
+    )
+    if not reported or reported == binding["unit"]:
+        return number
+    for converter in _CONVERTERS:
+        if {reported, binding["unit"]} <= converter.VALID_UNITS:
+            return converter.convert(number, reported, binding["unit"])
+    _LOGGER.debug("Cannot convert %s to %s", reported, binding["unit"])
+    return None
 
 
 def _matches(binding: dict[str, Any], state: State | None) -> bool:
@@ -388,13 +420,16 @@ class DisplayRuntime:
                 return (", ".join(active) or sig.label) if result else ""
             return result
         if source == "numeric":
-            value = _read(binding, self.hass.states.get(binding["entity"]))
+            state = self.hass.states.get(binding["entity"])
+            value = _read(binding, state)
             try:
                 number = float(value)
             except (TypeError, ValueError):
                 return None
             if sig.type == "text":
                 return value
+            if "unit" in binding and (number := _convert(binding, state, number)) is None:
+                return None
             low, high = binding.get("min", 0.0), binding.get("max", 100.0)
             level = (number - low) / (high - low) if high != low else float(number > low)
             level = min(1.0, max(0.0, level))

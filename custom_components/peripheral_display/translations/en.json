@@ -25,6 +25,7 @@
         "description": "Choose what drives each part of the scene. Leave a field empty to keep that part at rest; you can also drive any signal from automations with the `peripheral_display.set_signal` action.\n\n{signals}",
         "data": {
           "weather": "Weather",
+          "wind": "Wind",
           "night": "Night",
           "motion": "Motion sensors",
           "doorbell": "Doorbells",
@@ -39,6 +40,7 @@
         },
         "data_description": {
           "weather": "A weather entity; its condition picks the sky.",
+          "wind": "A weather entity (usually the same one); its wind speed brings the wind above 30 km/h, on top of any weather.",
           "night": "Defaults to the sun being below the horizon.",
           "motion": "Motion binary sensors, motion event entities, or timestamp sensors such as Ring's Last motion; shown for 2 minutes after motion.",
           "doorbell": "Binary sensors, doorbell event entities, or timestamp sensors such as Ring's Last ding; shown for 1 minute after a ring.",
@@ -81,6 +83,7 @@
         "description": "Choose what drives each part of the scene. Leave a field empty to keep that part at rest.\n\n{signals}",
         "data": {
           "weather": "Weather",
+          "wind": "Wind",
           "night": "Night",
           "motion": "Motion sensors",
           "doorbell": "Doorbells",
@@ -95,6 +98,7 @@
         },
         "data_description": {
           "weather": "A weather entity; its condition picks the sky.",
+          "wind": "A weather entity (usually the same one); its wind speed brings the wind above 30 km/h, on top of any weather.",
           "night": "Defaults to the sun being below the horizon.",
           "motion": "Motion binary sensors, motion event entities, or timestamp sensors such as Ring's Last motion; shown for 2 minutes after motion.",
           "doorbell": "Binary sensors, doorbell event entities, or timestamp sensors such as Ring's Last ding; shown for 1 minute after a ring.",

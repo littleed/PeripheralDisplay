@@ -78,6 +78,7 @@ until it is chosen again:
 | Signal     | Type    | Meaning                                         |
 |------------|---------|-------------------------------------------------|
 | `weather`  | enum    | `clear partly cloudy rain storm snow fog wind`  |
+| `wind`     | level   | how windy it is: 0 is too calm to show, 1 a gale |
 | `night`    | boolean | it is dark outside                              |
 | `motion`   | boolean | a motion sensor has triggered recently          |
 | `doorbell` | boolean | a doorbell rang recently                        |
@@ -142,6 +143,16 @@ to 100. Use `attribute` to read an attribute. For example, boiler power:
 
 ```yaml
 heating: {source: numeric, entity: sensor.boiler_power, max: 24000}
+```
+
+`unit` gives `min` and `max` in a unit of your choice (any unit Home
+Assistant converts, such as `km/h`, `mph`, `m/s`, `kn` or `°C`). The reading
+is converted from the unit the entity reports: `<attribute>_unit` for a
+weather attribute (e.g. `wind_speed_unit`), otherwise `unit_of_measurement`.
+For example, to start the test scene's wind at 20 mph instead of 30 km/h:
+
+```yaml
+wind: {unit: mph, min: 20, max: 40}
 ```
 
 ### `map`: text to an enum option
