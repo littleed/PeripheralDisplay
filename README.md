@@ -42,6 +42,7 @@ tagline and National Screen Service fine print on aged, folded paper.
 | side door  | the green side door swings open on a woman in a wide hat    | door, motion or doorbell sensors at the side door |
 | heating    | smoke from the steam train, heavier with more heating       | `climate` entities                 |
 | cinema     | a studio camera on the lawn, its reels turning              | `media_player`s                    |
+| season     | holiday editions of the painting. Christmas: the stars in a fur-trimmed cape and a snowy fedora with a gift, by a snowy house. Halloween: a scream queen and a vampire count | automatic: December, and 24 Oct – 7 Nov (editable) |
 
 ## Install
 
