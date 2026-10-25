@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180">
+  <!-- Cottage on a hill under a night sky, from firetv-screensaver res/drawable/banner.xml -->
+  <path fill="#1B2A4A" d="M0,0 h320 v180 h-320 Z"/>
+  <circle fill="#F2E6B8" cx="250" cy="45" r="16"/>
+  <path fill="#2F5D3A" d="M0,140 Q160,95 320,140 V180 H0 Z"/>
+  <path fill="#C9B79C" d="M135,95 h50 v35 h-50 Z"/>
+  <path fill="#7A3B2E" d="M128,97 L160,70 L192,97 Z"/>
+  <path fill="#FFD36B" d="M145,105 h12 v10 h-12 Z M165,105 h12 v10 h-12 Z"/>
+</svg>

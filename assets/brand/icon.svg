@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Cottage on a hill, from firetv-screensaver res/drawable/icon.xml, without the opaque square background -->
+  <path fill="#2F5D3A" d="M0,202 Q128,149 256,202 V256 H0 Z"/>
+  <path fill="#C9B79C" d="M85,117 h86 v64 h-86 Z"/>
+  <path fill="#7A3B2E" d="M69,123 L128,69 L187,123 Z"/>
+  <path fill="#FFD36B" d="M107,139 h16 v16 h-16 Z M133,139 h16 v16 h-16 Z"/>
+</svg>
