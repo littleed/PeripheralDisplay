@@ -142,6 +142,32 @@ def test_repeat_layers() -> None:
     assert [r[0].text for r in rects] == ["0 FRI RECYC…", "1 TUE FOOD"]
 
 
+@pytest.mark.parametrize("season", ["none", "christmas", "halloween"])
+@pytest.mark.parametrize("colors", [[], ["#000000"], ["#2c6bd0"], ["#2c6bd0", "#3e8e3a"], ["#2c6bd0", "#3e8e3a", "#7a4e2d"]])
+def test_poster_bin_colours_and_empty_railway(season, colors) -> None:
+    """The poster caps colours at two and never smokes without a train."""
+    scene = load_scene_file(TEST_SCENE.with_name("film_poster.yaml"))
+    bins = [
+        {"name": f"Collection {i}", "color": color, "day": "FRI", "date": "2026-10-30"}
+        for i, color in enumerate(colors)
+    ]
+    svg = scene.render({"bins": bins, "season": season, "heating": 1})
+    layers = _layers(svg)
+    assert ("layer-bins" in layers) == bool(colors)
+    assert ("layer-smoke" in layers) == bool(colors)
+    assert ("layer-smoke_heavy" in layers) == bool(colors)
+    assert ("layer-empty_railway" in layers) == (not colors)
+    root = ET.fromstring(svg)
+    ns = {"svg": "http://www.w3.org/2000/svg"}
+    train = root.find("svg:g[@id='layer-bins']", ns)
+    if colors:
+        assert [node.get("flood-color") for node in train.findall(".//svg:feFlood", ns)] == colors[:2]
+        assert not train.findall(".//svg:text", ns)
+        assert "layer-smoke" not in _layers(scene.render({"bins": bins, "season": season}))
+    visible_text = " ".join(node.text or "" for node in root.findall(".//svg:text", ns))
+    assert "Collection" not in visible_text and "FRI" not in visible_text
+
+
 def test_resolve_binding() -> None:
     scene = load_scene_file(TEST_SCENE)
     motion = scene.signals["motion"]

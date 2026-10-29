@@ -40,9 +40,20 @@ tagline and National Screen Service fine print on aged, folded paper.
 | night      | a night-blue poster with a crescent moon and stars          | `sun.sun` (pre-filled)             |
 | doorbell   | the red front door swings open on a shadowy man in a fedora | doorbell sensors, `event`s, or Ring's *Last ding* |
 | side door  | the green side door swings open on a woman in a wide hat    | door, motion or doorbell sensors at the side door |
-| heating    | smoke from the steam train, heavier with more heating       | `climate` entities                 |
+| heating    | smoke from the steam train when bins are due, heavier with more heating | `climate` entities                 |
+| bins       | a train in the colours of the bins due this week; no train when none are due | one entry per bin: name, calendar, title words, colour |
 | cinema     | a studio camera on the lawn, its reels turning              | `media_player`s                    |
 | season     | holiday editions of the painting. Christmas: the stars in a fur-trimmed cape and a snowy fedora with a gift, by a snowy house. Halloween: a scream queen and a vampire count | automatic: December, and 24 Oct – 7 Nov (editable) |
+
+The train supports **at most two bin colours in the coming seven days** (today
+plus six more). With one bin due, both the locomotive and tender take its
+colour. With two, the locomotive takes the first bin's colour and the tender
+takes the second. Any further bins are not represented. Collections are ordered
+by date, then by their configured order when dates match, just as in Cottage in
+the Valley. No bin names, collection days or dates are printed in the scene.
+When nothing is due (or bins are not configured), the train and its smoke are
+absent, leaving an empty railway; a black train therefore means a black bin is
+due, not that there is no collection.
 
 ## Install
 
