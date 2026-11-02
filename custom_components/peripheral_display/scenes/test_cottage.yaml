@@ -10,6 +10,7 @@
 #   lights   -> windows light up in proportion to the lights that are on
 #   heating  -> chimney smoke, denser with more heating
 #   cinema   -> the snug window flickers with two viewers silhouetted
+#   drying   -> a whirligig with washing appears when drying conditions are good
 #   bins     -> every bin due in the coming week, in its own colour and with its day
 #   offline  -> the telephone wire snaps and sparks (a bird sits on it when online)
 #   alert    -> a pigeon flies in with the matching headline on a banner
@@ -111,6 +112,14 @@ signals:
       source: state
       domains: [media_player]
       match: [playing]
+  drying:
+    type: boolean
+    label: Clothes drying
+    description: A whirligig with washing appears while your clothes-drying helper is on.
+    bind:
+      source: state
+      domains: [binary_sensor, input_boolean]
+      match: ["on"]
   bins:
     type: items
     label: Bins
@@ -731,6 +740,29 @@ layers:
     svg: |
       <line x1="1084" y1="626" x2="1084" y2="666" stroke="#222" stroke-width="2"/>
       <path d="M1050,630 A34,24 0 0 1 1118,630 Z" fill="#3d6fb6"/>
+
+  - id: whirligig
+    when: drying
+    svg: |
+      <g transform="translate(420 778)">
+        <title>Good weather for drying clothes</title>
+        <ellipse cy="2" rx="65" ry="8" fill="#000" opacity="0.12"/>
+        <path d="M0,0 V-155" stroke="{{ fence }}" stroke-width="6" stroke-linecap="round"/>
+        <g fill="none" stroke="{{ fence }}" stroke-linejoin="round">
+          <path d="M0,-148 L-110,-119 L0,-88 L110,-119 Z M-78,-119 L0,-140 L78,-119 L0,-97 Z M-43,-119 L0,-131 L43,-119 L0,-107 Z" stroke-width="1.5"/>
+          <path d="M-110,-119 L0,-116 L110,-119 M0,-148 V-88" stroke-width="3"/>
+          <path d="M-110,-119 L0,-101 L110,-119" stroke-width="3"/>
+        </g>
+        <path d="M-100,-117 L-46,-108 L-49,-41 Q-74,-34 -100,-48 Z" fill="{{ fence }}"/>
+        <path d="M-28,-105 L-17,-110 Q-9,-100 -1,-107 L12,-99 L24,-77 L10,-71 L5,-84 L3,-40 L-29,-45 L-25,-85 L-33,-76 L-43,-85 Z" fill="#537b99"/>
+        <path d="M36,-106 L67,-111 L70,-48 Q55,-43 38,-46 Z" fill="#a34b4f"/>
+        <path d="M76,-112 L101,-118 L105,-47 Q90,-41 77,-45 Z" fill="{{ fence }}"/>
+        <g fill="none" stroke="#000" stroke-opacity="0.12" stroke-width="2">
+          <path d="M-90,-106 L-91,-53 M-58,-101 L-59,-47 M-17,-96 L-18,-51 M46,-97 L48,-53 M87,-104 L89,-51"/>
+        </g>
+        <path d="M-96,-120 V-111 M-50,-112 V-103 M-24,-111 V-102 M10,-105 V-96 M40,-110 V-101 M63,-114 V-105 M80,-116 V-107 M98,-121 V-112" stroke="#ba8b50" stroke-width="3"/>
+        <circle cy="-115" r="5" fill="{{ fence }}"/>
+      </g>
 
   - id: fence
     svg: |

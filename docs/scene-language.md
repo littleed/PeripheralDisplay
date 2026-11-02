@@ -86,6 +86,7 @@ until it is chosen again:
 | `lights`   | level   | the share of chosen lights that are on          |
 | `heating`  | level   | how much heating is running                     |
 | `cinema`   | boolean | a film is playing                               |
+| `drying`   | boolean | conditions are good for hanging washing out      |
 | `bins`     | items   | the bins due for collection in the coming week  |
 | `offline`  | boolean | the internet connection is down                 |
 | `season`   | enum    | `none halloween christmas`                      |

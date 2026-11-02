@@ -29,12 +29,13 @@ SIGNALS = "sensor.living_room_art_active_signals"
 
 
 async def _setup(
-    hass: HomeAssistant, selections: dict[str, Any], overrides: dict[str, Any] | None = None
+    hass: HomeAssistant, selections: dict[str, Any], overrides: dict[str, Any] | None = None,
+    *, scene: str = "test_cottage",
 ) -> MockConfigEntry:
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Living room art",
-        options={"scene": "test_cottage", "selections": selections, "overrides": overrides or {}},
+        options={"scene": scene, "selections": selections, "overrides": overrides or {}},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -72,7 +73,7 @@ async def test_config_flow_creates_display(hass: HomeAssistant) -> None:
     fields = {str(k): k for k in result["data_schema"].schema}
     assert set(fields) == {
         "weather", "wind", "night", "motion", "doorbell", "side_door", "lights",
-        "heating", "cinema", "bins", "offline", "season", "alert",
+        "heating", "cinema", "drying", "bins", "offline", "season", "alert",
     }
     assert fields["night"].description == {"suggested_value": ["sun.sun"]}
     # The holiday rule is shown so it can be edited.
@@ -152,6 +153,24 @@ async def test_signals_follow_home_state(hass: HomeAssistant, hass_client) -> No
         assert layer in svg
     assert "layer-light_right" in svg  # 0.5 > 0.34
     assert "layer-light_gable" not in svg
+
+
+@pytest.mark.parametrize("scene", ["test_cottage", "film_poster"])
+async def test_whirligig_follows_drying_helper(hass: HomeAssistant, scene: str) -> None:
+    """Both scenes follow the helper, not their own weather or daylight rules."""
+    helper = "binary_sensor.good_to_hang_washing_out"
+    await _setup(hass, {"drying": [helper], "night": ["sun.sun"]}, scene=scene)
+    image = hass.data["image"].get_entity(IMAGE)
+    # An entity that is missing at startup must not put the washing out.
+    assert _signals(hass)["drying"] is False
+    assert 'id="layer-whirligig"' not in (await image.async_image()).decode()
+    hass.states.async_set("sun.sun", "below_horizon")
+    for state in ("on", "off", "on", "unknown", "on", "unavailable"):
+        hass.states.async_set(helper, state)
+        await hass.async_block_till_done()
+        expected = state == "on"
+        assert _signals(hass)["drying"] is expected
+        assert ('id="layer-whirligig"' in (await image.async_image()).decode()) is expected
 
 
 async def test_wind_speed_blows_over_any_weather(hass: HomeAssistant) -> None:

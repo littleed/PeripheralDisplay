@@ -24,6 +24,7 @@ entities, feeds, templates or automations.
 | lights     | windows light up with the share of lights that are on       | `light`s / `switch`es              |
 | heating    | chimney smoke, denser with more heating                     | `climate` entities                 |
 | cinema     | the snug window flickers, two viewers silhouetted           | `media_player`s                    |
+| drying     | a whirligig with washing appears in the garden              | your clothes-drying `binary_sensor` helper |
 | bins       | every bin due this week at the fence, in its colour, with its day | one entry per bin: name, calendar, title words, colour |
 | offline    | the telephone wire snaps and sparks                         | connectivity sensors (e.g. Ping)   |
 | alert      | a pigeon flies in with the matching headline                | keywords for Feed Reader items     |
@@ -43,7 +44,16 @@ tagline and National Screen Service fine print on aged, folded paper.
 | heating    | smoke from the steam train when bins are due, heavier with more heating | `climate` entities                 |
 | bins       | a train in the colours of the bins due this week; no train when none are due | one entry per bin: name, calendar, title words, colour |
 | cinema     | a studio camera on the lawn, its reels turning              | `media_player`s                    |
+| drying     | a painted whirligig with washing appears on the lawn        | your clothes-drying `binary_sensor` helper |
 | season     | holiday editions of the painting. Christmas: the stars in a fur-trimmed cape and a snowy fedora with a gift, by a snowy house. Halloween: a scream queen and a vampire count | automatic: December, and 24 Oct – 7 Nov (editable) |
+
+In either scene, select your template binary sensor (for example,
+`binary_sensor.good_to_hang_washing_out`) in **Configure → Change scene,
+screen shape and entities → Clothes drying**. The whirligig appears only
+while the helper is `on`; it disappears when `off`, `unknown` or
+`unavailable`, and stays hidden if unconfigured. Your helper decides the
+weather thresholds and daylight rules; the scene does not add any. The
+selection carries over when switching between these scenes.
 
 The train supports **at most two bin colours in the coming seven days** (today
 plus six more). With one bin due, both the locomotive and tender take its
