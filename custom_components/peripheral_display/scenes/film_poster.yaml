@@ -5,6 +5,7 @@
 #               (sunburst, clouds, rain, lightning, snowflakes, fog, wind) and
 #               the tagline; rain, snow, fog and wind across the picture
 #   night    -> a night-blue poster with a crescent moon and stars
+#   motion   -> a fedora-wearing stranger's shadow approaches across the lawn
 #   doorbell -> the red front door swings open on a shadowy figure
 #   side_door-> the green side door swings open on another figure
 #   heating  -> the steam train smokes, more heavily with more heating
@@ -25,7 +26,7 @@
 schema: peripheral-display/scene@1
 id: film_poster
 name: The Stranger at the Door (golden-age film poster)
-description: A 1940s Hollywood half-sheet poster whose weather, doors, steam train and camera follow the home.
+description: A 1940s Hollywood half-sheet poster whose weather, approaching shadow, doors, steam train and camera follow the home.
 author: Peripheral Display
 canvas: {width: 1600, height: 900}
 
@@ -56,6 +57,14 @@ signals:
       domains: [sun, binary_sensor, input_boolean]
       entities: [sun.sun]
       match: [below_horizon, "on"]
+  motion:
+    type: boolean
+    label: Motion
+    description: A stranger's shadow approaches across the lawn while outdoor motion is detected, and for 2 minutes after. Doorbell visitors remain visible independently.
+    bind:
+      source: state
+      domains: [binary_sensor, event, sensor]
+      hold: 120
   doorbell:
     type: boolean
     label: Doorbell
@@ -175,6 +184,8 @@ style: |
   .reveal { animation: reveal 1.6s ease-in 0.5s both; }
   @keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
   .appear { animation: reveal 0.8s ease-out both; }
+  .approach { animation: approach 3s ease-out both; }
+  @keyframes approach { from { transform: translate(-24px, 12px); opacity: 0; } to { transform: translate(0, 0); opacity: 1; } }
   .spin { animation: spin 2.4s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .fall { animation: fall 0.55s linear infinite; }
@@ -358,13 +369,23 @@ layers:
         <circle cx="973" cy="515" r="44" class="puff" style="animation-delay:-7.5s"/>
       </g></g>
 
+  # Keep the lawn shadow below both door overlays and away from their light spills.
+  - id: motion
+    when: motion
+    svg: |
+      <g transform="translate(-78 18) scale(0.866)">
+        <g class="approach">
+          <use href="#stranger" transform="matrix(2.8 0 -1.8 0.65 440 960)" fill="#0b090d" opacity="0.94" filter="url(#soft)"/>
+        </g>
+      </g>
+
   - id: front_door
     when: doorbell
     svg: |
       <g transform="translate(-78 18) scale(0.866)">
         <polygon points="691,851 739,851 772,893 656,893" fill="url(#spill)" opacity="{{ spill }}" class="reveal"/>
         <rect x="691" y="743" width="48" height="108" fill="url(#hall)"/>
-        <path transform="translate(719 851) scale(0.93)" fill="#0b090d" d="M-9,0 L-8,-29 L-16,-30 L-15,-50 L-19,-46 L-20,-56 L-19,-74 Q-18,-81 -11,-83 L-7,-85 L-6,-88 L-6,-93 L-15,-94 Q-17,-95 -15,-96.5 L-9,-97 L-8,-104 Q-6,-107 -2,-106 L0,-104.5 L2,-106 Q6,-107 8,-104 L9,-97 L15,-96.5 Q17,-95 15,-94 L6,-93 L6,-88 L7,-85 L11,-83 Q18,-81 19,-74 L20,-56 L19,-46 L15,-50 L16,-30 L8,-29 L9,0 L3,0 L1,-25 L-1,-25 L-3,0 Z" filter="url(#soft)"/>
+        <use href="#stranger" transform="translate(719 851) scale(0.93)" fill="#0b090d" filter="url(#soft)"/>
         <path d="M710,851 L728,851 L752,893 L700,893 Z" fill="url(#cast)" class="reveal"/>
         <g transform="translate(691 0)"><g class="swing"><g transform="translate(-691 0)">
           <use href="#art" clip-path="url(#front_door)"/>
@@ -590,6 +611,7 @@ defs: |
     <stop offset="0" stop-color="#0b090d" stop-opacity="0.55"/>
     <stop offset="1" stop-color="#0b090d" stop-opacity="0"/>
   </linearGradient>
+  <path id="stranger" d="M-9,0 L-8,-29 L-16,-30 L-15,-50 L-19,-46 L-20,-56 L-19,-74 Q-18,-81 -11,-83 L-7,-85 L-6,-88 L-6,-93 L-15,-94 Q-17,-95 -15,-96.5 L-9,-97 L-8,-104 Q-6,-107 -2,-106 L0,-104.5 L2,-106 Q6,-107 8,-104 L9,-97 L15,-96.5 Q17,-95 15,-94 L6,-93 L6,-88 L7,-85 L11,-83 Q18,-81 19,-74 L20,-56 L19,-46 L15,-50 L16,-30 L8,-29 L9,0 L3,0 L1,-25 L-1,-25 L-3,0 Z"/>
   <filter id="soft" x="-20%" y="-10%" width="140%" height="120%"><feGaussianBlur stdDeviation="0.7"/></filter>
   <radialGradient id="puff" cx="0.45" cy="0.4" r="0.55">
     <stop offset="0" stop-color="{{ smoke }}"/>

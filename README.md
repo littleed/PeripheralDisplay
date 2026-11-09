@@ -39,6 +39,7 @@ tagline and National Screen Service fine print on aged, folded paper.
 |------------|-------------------------------------------------------------|------------------------------------|
 | weather    | the poster's colour, a weather emblem around the title (sunburst, painted clouds, a lightning bolt, snowflakes, wind swirls), a tagline to match, and rain, snow or fog over the picture | a `weather` entity |
 | night      | a night-blue poster with a crescent moon and stars          | `sun.sun` (pre-filled)             |
+| motion     | a fedora-wearing stranger's shadow approaches across the lawn, then holds | outdoor motion sensors, events, or Ring's *Last motion* |
 | doorbell   | the red front door swings open on a shadowy man in a fedora | doorbell sensors, `event`s, or Ring's *Last ding* |
 | side door  | the green side door swings open on a woman in a wide hat    | door, motion or doorbell sensors at the side door |
 | heating    | smoke from the steam train when bins are due, heavier with more heating | `climate` entities                 |
@@ -54,6 +55,13 @@ while the helper is `on`; it disappears when `off`, `unknown` or
 `unavailable`, and stays hidden if unconfigured. Your helper decides the
 weather thresholds and daylight rules; the scene does not add any. The
 selection carries over when switching between these scenes.
+
+Motion and door activity are independent: if both trigger, the lawn shadow
+and the doorway visitor appear together without covering each other. The shadow
+stays while motion is detected and for two minutes afterwards; each door keeps
+its own one-minute hold. In the display's options, bind **Motion sensors** to
+outdoor motion and **Doorbell sensors** to rings (for Ring, *Last motion* and
+*Last ding* respectively).
 
 The train supports **at most two bin colours in the coming seven days** (today
 plus six more). With one bin due, both the locomotive and tender take its

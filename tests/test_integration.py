@@ -218,6 +218,78 @@ async def test_motion_holds_after_clearing(
     assert _signals(hass)["motion"] is False
 
 
+@pytest.mark.parametrize("kind", ["binary_sensor", "event", "timestamp"])
+async def test_poster_motion_and_doors_hold_independently(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, kind: str
+) -> None:
+    """Outdoor motion and a simultaneous ring coexist, including Ring timestamps."""
+    domain = "sensor" if kind == "timestamp" else kind
+    motion, doorbell = f"{domain}.garden_motion", f"{domain}.front_ding"
+    attrs = {"device_class": "timestamp"} if kind == "timestamp" else {}
+    old = (dt_util.utcnow() - timedelta(hours=3)).isoformat()
+    for entity in (motion, doorbell):
+        hass.states.async_set(entity, "off" if kind == "binary_sensor" else old, attrs)
+    hass.states.async_set("binary_sensor.side_door", "off")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Living room art",
+        options={
+            "scene": "film_poster",
+            "selections": {
+                "motion": [motion], "doorbell": [doorbell],
+                "side_door": ["binary_sensor.side_door"],
+            },
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    image = hass.data["image"].get_entity(IMAGE)
+
+    async def check(moving: bool, ringing: bool, side: bool) -> None:
+        svg = (await image.async_image()).decode()
+        for signal, layer, expected in (
+            ("motion", "motion", moving),
+            ("doorbell", "front_door", ringing),
+            ("side_door", "side_door", side),
+        ):
+            assert _signals(hass)[signal] is expected
+            assert (f'id="layer-{layer}"' in svg) is expected
+
+    await check(False, False, False)
+    hass.states.async_set(motion, "on" if kind == "binary_sensor" else dt_util.utcnow().isoformat(), attrs)
+    await hass.async_block_till_done()
+    await check(True, False, False)
+    hass.states.async_set(doorbell, "on" if kind == "binary_sensor" else dt_util.utcnow().isoformat(), attrs)
+    hass.states.async_set("binary_sensor.side_door", "on")
+    await hass.async_block_till_done()
+    await check(True, True, True)
+
+    if kind == "binary_sensor":
+        for entity in (motion, doorbell):
+            hass.states.async_set(entity, "off")
+    hass.states.async_set("binary_sensor.side_door", "off")
+    await hass.async_block_till_done()
+    await _advance(hass, freezer, 61)
+    await check(True, False, False)
+
+    # More motion extends only its own hold; it must not reopen either door.
+    hass.states.async_set(motion, "on" if kind == "binary_sensor" else dt_util.utcnow().isoformat(), attrs)
+    await hass.async_block_till_done()
+    if kind == "binary_sensor":
+        hass.states.async_set(motion, "off")
+        await hass.async_block_till_done()
+    await _advance(hass, freezer, 61)
+    await check(True, False, False)
+    await _advance(hass, freezer, 60)
+    await check(False, False, False)
+
+    # A ring on its own never invents outdoor motion.
+    hass.states.async_set(doorbell, "on" if kind == "binary_sensor" else dt_util.utcnow().isoformat(), attrs)
+    await hass.async_block_till_done()
+    await check(False, True, False)
+
+
 async def test_doorbell_from_ring_last_ding_timestamp(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory, caplog: pytest.LogCaptureFixture
 ) -> None:
